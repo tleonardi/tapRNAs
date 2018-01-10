@@ -1,0 +1,100 @@
+## Descriptive statistics
+```{r set-options, echo=FALSE, cache=FALSE}
+	options(replace.assign=TRUE,width=70)
+	opts_chunk$set(dev=c("png","pdf"), dpi=300, fig.path='genstat-fig/', cache.path='cache/genstat-', par=TRUE, echo=FALSE, warning=F, message=F, cache=FALSE, results='hide', error=F)
+```
+
+```{r load-libs, cache=F}
+load("report/data/pc.Rdata")
+source("functions.R")
+library(ggplot2)
+library(scales)
+library(dplyr)
+pc$DeNovo <- NA
+pc[grepl("ENST", pc$Name), "DeNovo"] <- "Gencode"
+pc[grepl("TCONS", pc$Name), "DeNovo"] <- "Novel"
+```
+
+```{r Number-per-gene, fig.cap="Distribution of number of pcRNAs associated with the same protein coding gene"}
+ggplot(as.data.frame(table(pc[,"Close GeneSym"])),aes(Freq))+geom_histogram(origin=0.5,binwidth=1,colour="white",size=0.5)+scale_x_continuous(breaks=c(1:max(table(pc[,"Close GeneSym"]))),name="Number of pcRNAs per coding gene")+ylab("Count")+theme_bw()
+```
+Number of pcRNAs per coding gene: mean `r mean(table(pc[,"Close GeneSym"]))` (sd: `r sd(table(pc[,"Close GeneSym"]))`); median `r median(table(pc[,"Close GeneSym"]))`
+
+```{r N-per-class, fig.cap="Number of pcRNAs split by positional category"}
+ggplot(pc,aes(Context,fill=Orientation))+geom_histogram(origin=0.5,binwidth=1,colour="white",size=0.5)+ylab("Count")+theme_bw()
+```
+
+```{r N-per-class-table, results="asis", fig.cap="Table showing the percentage of pcRNAs in each orientation"}
+kable(t(table(pc$Context)/nrow(pc)*100), format = "markdown")
+```
+
+Table showing the percentage of pcRNAs in each orientation
+
+```{r N-per-class2, fig.cap="Number of Gencode and novel pcRNAs split by positional category"}
+ggplot(pc,aes(Context,fill=Orientation))+geom_histogram(origin=0.5,binwidth=1,colour="white",size=0.5)+ylab("Count")+theme_bw()  + facet_wrap(~DeNovo)
+```
+
+```{r N-exon, fig.width=8, fig.cap="Number of exons per pcRNA"}
+ggplot(pc,aes(BlockCount))+geom_histogram(binwidth=1,origin=1.5,colour="white",position="dodge")+scale_x_continuous("Number of exons",breaks=c(2:max(pc$BlockCount)))+ylab("Count")+theme_bw()
+```
+Number of exons per pcRNA: mean `r mean(pc$BlockCount)` (sd: `r sd(pc$BlockCount)`); median `r median(pc$BlockCount)`
+
+```{r N-exon-denovo, fig.width=8, fig.cap="Number of exons per Gencode and novel pcRNA "}
+ggplot(pc,aes(BlockCount))+geom_histogram(binwidth=1,origin=1.5,colour="white",position="dodge")+scale_x_continuous("Number of exons",breaks=c(2:max(pc$BlockCount)))+ylab("Count")+theme_bw() + facet_wrap(~DeNovo)
+```
+Number of exons per Gencode pcRNA: mean `r mean(pc[pc$DeNovo=="Gencode", "BlockCount"])` (sd: `r sd(pc[pc$DeNovo=="Gencode", "BlockCount"])`); median `r median(pc[pc$DeNovo=="Gencode", "BlockCount"])`
+
+Number of exons per novel pcRNA: mean `r mean(pc[pc$DeNovo=="Novel", "BlockCount"])` (sd: `r sd(pc[pc$DeNovo=="Novel", "BlockCount"])`); median `r median(pc[pc$DeNovo=="Novel", "BlockCount"])`
+
+```{r N-exon-per-class, fig.width=9, fig.cap="Number of exon per pcRNAs, diveded by positional category"}
+ggplot(pc,aes(BlockCount,fill=Orientation))+geom_histogram(binwidth=1,origin=1.5,colour="white",position="dodge")+scale_x_continuous("Number of exons",breaks=c(2:max(pc$BlockCount)))+ylab("Count")+facet_wrap(~Context)+theme_bw()
+```
+
+```{r size-distr, fig.cap="Distribution of pcRNAs exonic size"}
+ggplot(pc,aes(Score,colour=Context))+geom_density(alpha=0.5)+facet_wrap(~Orientation)+scale_x_log10(name="Size")+ggtitle("pcRNAs size distribution")+theme_bw()
+```
+Size of pcRNAs: mean `r mean(pc$Score)` (sd: `r sd(pc$Score)`); median `r median(pc$Score)`
+
+```{r size-distr2, fig.cap="Distribution of Gencode and novel pcRNAs exonic size"}
+ggplot(pc,aes(Score,colour=Context))+geom_density(alpha=0.5)+ facet_grid(Orientation~DeNovo)+scale_x_log10(name="Size")+ggtitle("pcRNAs size distribution")+theme_bw()
+```
+Size of Gencode pcRNAs: mean `r mean(pc[pc$DeNovo=="Gencode", "Score"])` (sd: `r sd(pc[pc$DeNovo=="Gencode", "Score"])`); median `r median(pc[pc$DeNovo=="Gencode", "Score"])`
+
+Size of Novel pcRNAs: mean `r mean(pc[pc$DeNovo=="Novel", "Score"])` (sd: `r sd(pc[pc$DeNovo=="Novel", "Score"])`); median `r median(pc[pc$DeNovo=="Novel", "Score"])`
+
+```{r size-distr3, fig.cap="Distribution of pcRNAs exonic size by number of exons"}
+ggplot(pc, aes(x=BlockCount, y=Score)) + facet_wrap(~Context, scales="free_y") + geom_point() + geom_smooth() + xlab("Number of exons") + ylab("log10 of exonic size")
+```
+The size distribution is bimodal because there are several transcripts (not necessarily with many exons) of unusually long size.
+
+```{r Distance-distrib, fig.cap="Distribution of distances between the start of pcRNAs and the start of their protein coding partners"}
+ggplot(pc,aes(`Dist (st-st)`))+geom_density()+theme_bw()+xlab("Distance (st-st)") + facet_wrap(~Orientation,scales="free") + scale_x_continuous(labels = fancy_scientific)
+```
+
+```{r Distance-distriblog, fig.cap="Distribution of log10 of absolute value of distances between the start of pcRNAs and the start of their protein coding partners. 1bp was added to each datapoint in order to calculate the logarithm when the distance is 0."}
+ggplot(pc,aes(abs(`Dist (st-st)`)+1))+geom_density()+theme_bw()+xlab("Distance (st-st)") + facet_wrap(~Orientation,scales="free") + scale_x_log10("Distance (st-st)", breaks = trans_breaks("log10", function(x) 10^x), labels = trans_format("log10", math_format(10^.x)))
+```
+
+```{r Distance-by-class, fig.width=9, fig.cap="Distribution of distances between the start of pcRNAs and the start of their protein coding partners, by class"}
+ggplot(pc,aes(`Dist (st-st)`, colour=Context, fill=Context))+geom_density(alpha=0.2)+theme_bw()+xlab("Distance (st-st)") + facet_wrap(~Orientation,scales="free") + scale_x_continuous(labels = fancy_scientific)
+```
+
+```{r Distance-by-class2, fig.cap="Distribution of log10 of absolute values of distances between the start of pcRNAs and the start of their protein coding partners, by class. 1bp was added to each datapoint in order to calculate the logarithm when the distance is 0."}
+ggplot(pc,aes(abs(`Dist (st-st)`)+1, colour=Context, fill=Context))+geom_density(alpha=0.2)+theme_bw()+xlab("Distance (st-st)")+ facet_wrap(~Context) + scale_x_log10("Distance (st-st)", breaks = trans_breaks("log10", function(x) 10^x), labels = trans_format("log10", math_format(10^.x)))
+```
+
+```{r Distance-by-class3, fig.cap="Boxplots of log10 of absolute values of distances between the start of pcRNAs and the start of their protein coding partners, by class. 1bp was added to each datapoint in order to calculate the logarithm when the distance is 0."}
+ggplot(pc,aes(y=abs(`Dist (st-st)`)+1, x=Context, fill=Context))+geom_boxplot()+theme_bw()+xlab("Distance (st-st)")+ scale_y_log10("Distance (st-st)", breaks = trans_breaks("log10", function(x) 10^x), labels = trans_format("log10", math_format(10^.x)))
+```
+
+```{r Distance-by-class4, results="asis", fig.cap="Table showing mean, median, max and min distances between the TSS of pcRNAs and their corresponding genes"}
+kable(group_by(pc, Context) %>% dplyr::summarize(mean=mean(`Dist (st-st)`), median=quantile(`Dist (st-st)`,0.5), min=min(`Dist (st-st)`), max=max(`Dist (st-st)`)), format = "markdown")
+```
+
+Table showing mean, median, max and min distances between the TSS of pcRNAs and their corresponding genes.
+
+```{r Distance-by-class5, results="asis", fig.cap="Table showing mean, median, max and min distances between the TSS of pcRNAs and their corresponding genes"}
+kable(dplyr::summarize(pc, mean=mean(`Dist (st-st)`), min=min(`Dist (st-st)`), perc25=quantile(`Dist (st-st)`,0.25), median=quantile(`Dist (st-st)`,0.5), perc75=quantile(`Dist (st-st)`,0.75), max=max(`Dist (st-st)`), perc70=quantile(`Dist (st-st)`,0.70)), format = "markdown")
+ ```
+
+Table showing mean, median, max, min and quantiles of distances between the TSS of pcRNAs and their corresponding genes.

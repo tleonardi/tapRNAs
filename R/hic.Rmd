@@ -1,0 +1,338 @@
+## Analysis of HiC data
+```{r set-options, echo=FALSE, cache=FALSE}
+        options(replace.assign=TRUE,width=70)
+        opts_chunk$set(dev=c("png","pdf"), dpi=300, fig.path='hic-fig/', cache.path='cache/hic-', par=TRUE, echo=FALSE, warning=F, message=F, cache=FALSE, results='hide', error=F)
+```
+
+```{r}
+library(dplyr)
+library(ggplot2)
+library(reshape)
+library(gplots)
+# Needed for pretty10exp()
+library(sfsmisc)
+library(RColorBrewer)
+library(VennDiagram)
+hmcol <- colorRampPalette(brewer.pal(9, "GnBu"))(100)
+pretty10exp2 <- Vectorize(function(x, ...) { 
+	if(is.na(x)) "NA"
+	else pretty10exp(x, digits=3, ...)	
+})
+BASEDIR="/nfs/research2/enright/tom/projects/new-pcRNAs/analysis"
+```
+
+
+
+```{r}
+loops_contact_summary <- read.delim(paste0(BASEDIR,"/downstream/hic/loopOverlapAllLines/loops_contact_summary.txt"), header=T, sep=" ")
+
+# Plot ratio of pc with a generic or exonic peak
+loops_sumAll <- filter(loops_contact_summary, Category %in% c("pcRNA", "lincRNAs", "pcCoding", "GencodeCoding")) %>% mutate(GenericLoop=WithLoop/Total, ExonicLoop=WithExonicLoop/Total) %>% melt(measure.vars=c("GenericLoop", "ExonicLoop"))
+loops_sumAll$Category <- factor(loops_sumAll$Category, levels=c("pcRNA", "lincRNAs", "pcCoding", "GencodeCoding"))
+
+#phyper(q, m, n, k, lower.tail = TRUE, log.p = FALSE)
+#q	vector of quantiles representing the number of white balls drawn without replacement from an urn which contains both black and white balls.
+#m	the number of white balls in the urn.
+#n	the number of black balls in the urn.
+#k	the number of balls drawn from the urn.
+
+
+p1 <- phyper(loops_sumAll[1,2], loops_sumAll[2,2], loops_sumAll[2,4] - loops_sumAll[2,2], loops_sumAll[1,4], lower.tail=F)
+p2 <- phyper(loops_sumAll[3,2], loops_sumAll[4,2], loops_sumAll[4,4] - loops_sumAll[4,2], loops_sumAll[3,4], lower.tail=F)
+p3 <- phyper(loops_sumAll[1,3], loops_sumAll[2,3], loops_sumAll[2,4] - loops_sumAll[2,3], loops_sumAll[1,4], lower.tail=F)
+p4 <- phyper(loops_sumAll[3,3], loops_sumAll[4,3], loops_sumAll[4,4] - loops_sumAll[4,3], loops_sumAll[3,4], lower.tail=F)
+
+annot_text <- data.frame(variable="GenericLoop", Category="pcRNA", y=loops_sumAll[1,6]+0.025, p=p1)
+annot_text <- rbind(annot_text, data.frame(variable="GenericLoop", Category="pcCoding", y=loops_sumAll[3,6]+0.025, p=p2))
+annot_text <- rbind(annot_text, data.frame(variable="ExonicLoop", Category="pcRNA", y=loops_sumAll[5,6]+0.025, p=p3))
+annot_text <- rbind(annot_text, data.frame(variable="ExonicLoop", Category="pcCoding", y=loops_sumAll[7,6]+0.025, p=p4))
+
+loop_numbAll <- ggplot(loops_sumAll, aes(x=Category, y=value, fill=Category)) + geom_bar(stat="identity") + facet_wrap(~variable) + geom_text(data=annot_text, aes(x=Category, y=y, label=paste(pretty10exp2(p))), parse=T, size=3) + ylab("Ratio") + theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust=0.5))
+```
+
+
+
+
+```{r}
+# Plot ratio of pc with a generic or exonic peak split by category
+loops_sumCatAll <- filter(loops_contact_summary, !Category %in% c("pcRNA", "lincRNAs", "pcCoding", "GencodeCoding")) %>% mutate(GenericLoop=WithLoop/Total, ExonicLoop=WithExonicLoop/Total) %>% melt(measure.vars=c("GenericLoop", "ExonicLoop"))
+loops_sumCatAll$n <- NA
+loops_sumCatAll[loops_sumCatAll$variable=="GenericLoop", "n"] <- loops_sumCatAll[loops_sumCatAll$variable=="GenericLoop", "WithLoop"]
+loops_sumCatAll[loops_sumCatAll$variable=="ExonicLoop", "n"] <- loops_sumCatAll[loops_sumCatAll$variable=="ExonicLoop", "WithExonicLoop"]
+
+loop_numbCatAll <- ggplot(loops_sumCatAll, aes(x=Category, y=value, colour=Category, size=n)) + geom_point() + facet_wrap(~variable) + ylab("Ratio") + theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust=0.5))
+```
+
+```{r}
+# Plot ratio of pc with a promoter peak
+loops_sumPromoter <- read.delim(paste0(BASEDIR,"/downstream/hic/loopOverlapAllLinesPromoter/loops_contact_summary.txt"), header=T, sep=" ", strip.white=T) %>% mutate(FractionWithLoop=WithLoop/Total)
+loops_sumPromoter$Category <- factor(loops_sumPromoter$Category, levels=c("pcRNA", "lincRNAs", "pcCoding", "GencodeCoding"))
+
+#phyper(q, m, n, k, lower.tail = TRUE, log.p = FALSE)
+#q      vector of quantiles representing the number of white balls drawn without replacement from an urn which contains both black and white balls.
+#m      the number of white balls in the urn.
+#n      the number of black balls in the urn.
+#k      the number of balls drawn from the urn.
+
+
+p1 <- phyper(loops_sumPromoter[1,2], loops_sumPromoter[2,2], loops_sumPromoter[2,3] - loops_sumPromoter[2,2], loops_sumPromoter[1,3], lower.tail=F)
+p2 <- phyper(loops_sumPromoter[3,2], loops_sumPromoter[4,2], loops_sumPromoter[4,3] - loops_sumPromoter[4,2], loops_sumPromoter[3,3], lower.tail=F)
+
+annot_text <- data.frame(Category="pcRNA", y=loops_sumPromoter[1,4]+0.025, p=p1)
+annot_text <- rbind(annot_text, data.frame(Category="pcCoding", y=loops_sumPromoter[3,4]+0.025, p=p2))
+
+loop_numbPromoter <- ggplot(loops_sumPromoter, aes(x=Category, y=FractionWithLoop, fill=Category)) + geom_bar(stat="identity")+ geom_text(data=annot_text, aes(x=Category, y=y, label=paste(pretty10exp2(p))), parse=T, size=3) + ylab("Ratio") + theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust=0.5))
+```
+
+
+
+```{r otherLines}
+
+# Load pc HMM data
+pcEndHMM_Gm12878 <- read.delim(paste0(BASEDIR,"/downstream/hic/pcRNA_loop_endPoints_hmmGm12878_table.txt"), header=F, sep="\t") %>% mutate(fraction=V3/V2, V4=gsub("^[0-9]+_","",V4)) %>% group_by(V1,V4) %>% summarize(Gm12878=sum(fraction))  
+pcEndHMM_Hmec <- read.delim(paste0(BASEDIR,"/downstream/hic/pcRNA_loop_endPoints_hmmHmec_table.txt"), header=F, sep="\t") %>% mutate(fraction=V3/V2, V4=gsub("^[0-9]+_","",V4)) %>% group_by(V1,V4) %>% summarize(Hmec=sum(fraction))  
+pcEndHMM_Huvec <- read.delim(paste0(BASEDIR,"/downstream/hic/pcRNA_loop_endPoints_hmmHuvec_table.txt"), header=F, sep="\t") %>% mutate(fraction=V3/V2, V4=gsub("^[0-9]+_","",V4)) %>% group_by(V1,V4) %>% summarize(Huvec=sum(fraction))  
+pcEndHMM_Nhek <- read.delim(paste0(BASEDIR,"/downstream/hic/pcRNA_loop_endPoints_hmmNhek_table.txt"), header=F, sep="\t") %>% mutate(fraction=V3/V2, V4=gsub("^[0-9]+_","",V4)) %>% group_by(V1,V4) %>% summarize(Nhek=sum(fraction))  
+pcEndHMM_K562 <- read.delim(paste0(BASEDIR,"/downstream/hic/pcRNA_loop_endPoints_hmmK562_table.txt"), header=F, sep="\t") %>% mutate(fraction=V3/V2, V4=gsub("^[0-9]+_","",V4)) %>% group_by(V1,V4) %>% summarize(K562=sum(fraction))  
+pcEndHMM_H1hesc <- read.delim(paste0(BASEDIR,"/downstream/hic/pcRNA_loop_endPoints_hmmH1hesc_table.txt"), header=F, sep="\t") %>% mutate(fraction=V3/V2, V4=gsub("^[0-9]+_","",V4)) %>% group_by(V1,V4) %>% summarize(H1hesc=sum(fraction))  
+pcEndHMM_Hepg2 <- read.delim(paste0(BASEDIR,"/downstream/hic/pcRNA_loop_endPoints_hmmHepg2_table.txt"), header=F, sep="\t") %>% mutate(fraction=V3/V2, V4=gsub("^[0-9]+_","",V4)) %>% group_by(V1,V4) %>% summarize(Hepg2=sum(fraction))  
+pcEndHMM_Hsmm <- read.delim(paste0(BASEDIR,"/downstream/hic/pcRNA_loop_endPoints_hmmHsmm_table.txt"), header=F, sep="\t") %>% mutate(fraction=V3/V2, V4=gsub("^[0-9]+_","",V4)) %>% group_by(V1,V4) %>% summarize(Hsmm=sum(fraction))  
+pcEndHMM_Nhlf <- read.delim(paste0(BASEDIR,"/downstream/hic/pcRNA_loop_endPoints_hmmNhlf_table.txt"), header=F, sep="\t") %>% mutate(fraction=V3/V2, V4=gsub("^[0-9]+_","",V4)) %>% group_by(V1,V4) %>% summarize(Nhlf=sum(fraction))  
+
+# Merge in single DF
+HMM_full <- merge(pcEndHMM_Gm12878, pcEndHMM_Hmec, by=c("V1","V4"), all=T) %>% merge(., pcEndHMM_Huvec, by=c("V1","V4"), all=T) %>% merge(., pcEndHMM_Nhek, by=c("V1","V4"), all=T) %>% merge(.,pcEndHMM_K562, by=c("V1","V4"), all=T) %>% merge(., pcEndHMM_H1hesc, by=c("V1","V4"), all=T) %>% merge(., pcEndHMM_Hepg2, by=c("V1","V4"), all=T) %>% merge(., pcEndHMM_Hsmm, by=c("V1","V4"), all=T) %>% merge(., pcEndHMM_Nhlf, by=c("V1","V4"), all=T)
+HMM_full[is.na(HMM_full)] <- 0
+# Melt the data
+HMM_full_melt <- melt(HMM_full)
+
+# Rename the classes and summarise them
+HMM_full_melt[HMM_full_melt$V4 %in% c("Strong_Enhancer", "Weak_Enhancer"), "V4"] <- "Enhancer"
+HMM_full_melt[HMM_full_melt$V4 %in% c("Active_Promoter", "Weak_Promoter", "Poised_Promoter"), "V4"] <- "Promoter"
+HMM_full_melt[HMM_full_melt$V4 %in% c("Txn_Elongation", "Txn_Transition", "Weak_Txn"), "V4"] <- "Transcript"
+HMM_full_melt[HMM_full_melt$V4 %in% c("Repressed", "Insulator", "Repetitive/CNV", "Heterochrom/lo"), "V4"] <- "Other"
+HMM_full_melt$V4 <- factor(HMM_full_melt$V4, levels=c("Enhancer", "Promoter", "Transcript", "Other"))
+HMM_full_melt <- filter(HMM_full_melt) %>% group_by(V1, variable, V4) %>% summarize(value=sum(value))
+
+# Cast to matrix again to fill with 0s the missing values
+HMM_full_matrix <- cast(HMM_full_melt, V1~V4+variable, value="value", fill=0)
+# And melt again
+HMM_full_matrix_melt <- melt(HMM_full_matrix)
+
+# Do the clustering to decide the ordering of the heatmap
+dd.row <- as.dendrogram(hclust(dist(HMM_full_matrix)))
+row.ord <- order.dendrogram(dd.row)
+ord_names <- HMM_full_matrix[row.ord,"V1"]
+
+# Reorder the names based on the clustering
+HMM_full_matrix_melt$V1<-factor(HMM_full_matrix_melt$V1, levels=ord_names)
+
+# Plot the heatmap
+HMM_fullPlot <- ggplot(HMM_full_matrix_melt, aes(x=V4, y=V1, fill=value)) + geom_tile(colour="transparent") + facet_wrap(~variable, ncol=9)  + theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust=0.5), axis.ticks = element_blank(), axis.text.y = element_blank()) +  scale_fill_gradientn(colours=hmcol, na.value="black") + ylab("pcRNAs") + xlab("")
+
+
+# For each HMM category take all end-points and for each cell lines filter the one with the highest percentage.
+# The resulting DF means that the pcRNA end-point x has one loop (in one or more cell types) that is m% enhancer.
+allCategories <- unique(HMM_full_melt$V4)
+
+pc_enrichment <- data.frame(Fraction=rep(seq(1,0,-0.1), length(allCategories)), N=NA, Tot=NA, Category=rep(allCategories, each=11))
+
+pc_allCat_percent <- list()
+for(cat in allCategories){
+	pc_max_cat_percent <- HMM_full_matrix_melt[ HMM_full_matrix_melt$V4 == cat,] %>% mutate(pc=gsub("chr[0-9XY]+(E|T.+)", "\\1", V1)) %>% group_by(V1) %>% summarize(m=max(value))
+        pc_allCat_percent[[cat]] <- pc_max_cat_percent
+	pc_enrichment[pc_enrichment$Category==cat, "Tot"] <- nrow(pc_max_cat_percent)
+
+	# Calculate how many pcRNA promoters are in contact with regions that are enhancer more than i%.
+	for(i in seq(1,0,-0.1)){
+		pc_enrichment[pc_enrichment$Category==cat & pc_enrichment$Fraction==i, "N"] <- sum(pc_max_cat_percent$m>=i)
+		pc_enrichment[pc_enrichment$Category==cat & pc_enrichment$Fraction==i, "Label"] <- paste(">=",i,sep="")
+	}
+}
+
+pc_max_percent <- mutate(HMM_full_matrix_melt, pc=gsub("chr[0-9XY]+(E|T.+)", "\\1", V1)) %>% group_by(V1, V4) %>% summarize(m=max(value))
+
+#### ENRICHMENT ANALYSIS FOR LINCs ####
+# Load the lincRNAs data
+genomeEndHMM_Gm12878 <- read.delim(paste0(BASEDIR,"/downstream/hic/genome_loop_endPoints_hmmGm12878_table.txt"), header=F, sep="\t") %>% mutate(fraction=V3/V2, V4=gsub("^[0-9]+_","",V4)) %>% group_by(V1,V4) %>% summarize(Gm12878=sum(fraction))
+genomeEndHMM_Hmec <- read.delim(paste0(BASEDIR,"/downstream/hic/genome_loop_endPoints_hmmHmec_table.txt"), header=F, sep="\t") %>% mutate(fraction=V3/V2, V4=gsub("^[0-9]+_","",V4)) %>% group_by(V1,V4) %>% summarize(Hmec=sum(fraction))
+genomeEndHMM_Huvec <- read.delim(paste0(BASEDIR,"/downstream/hic/genome_loop_endPoints_hmmHuvec_table.txt"), header=F, sep="\t") %>% mutate(fraction=V3/V2, V4=gsub("^[0-9]+_","",V4)) %>% group_by(V1,V4) %>% summarize(Huvec=sum(fraction))
+genomeEndHMM_Nhek <- read.delim(paste0(BASEDIR,"/downstream/hic/genome_loop_endPoints_hmmNhek_table.txt"), header=F, sep="\t") %>% mutate(fraction=V3/V2, V4=gsub("^[0-9]+_","",V4)) %>% group_by(V1,V4) %>% summarize(Nhek=sum(fraction))
+genomeEndHMM_H1hesc <- read.delim(paste0(BASEDIR,"/downstream/hic/genome_loop_endPoints_hmmH1hesc_table.txt"), header=F, sep="\t") %>% mutate(fraction=V3/V2, V4=gsub("^[0-9]+_","",V4)) %>% group_by(V1,V4) %>% summarize(H1hesc=sum(fraction))
+genomeEndHMM_Hepg2 <- read.delim(paste0(BASEDIR,"/downstream/hic/genome_loop_endPoints_hmmHepg2_table.txt"), header=F, sep="\t") %>% mutate(fraction=V3/V2, V4=gsub("^[0-9]+_","",V4)) %>% group_by(V1,V4) %>% summarize(Hepg2=sum(fraction))
+genomeEndHMM_Hsmm <- read.delim(paste0(BASEDIR,"/downstream/hic/genome_loop_endPoints_hmmHsmm_table.txt"), header=F, sep="\t") %>% mutate(fraction=V3/V2, V4=gsub("^[0-9]+_","",V4)) %>% group_by(V1,V4) %>% summarize(Hsmm=sum(fraction))
+genomeEndHMM_Nhlf <- read.delim(paste0(BASEDIR,"/downstream/hic/genome_loop_endPoints_hmmNhlf_table.txt"), header=F, sep="\t") %>% mutate(fraction=V3/V2, V4=gsub("^[0-9]+_","",V4)) %>% group_by(V1,V4) %>% summarize(Nhlf=sum(fraction))
+genomeEndHMM_K562 <- read.delim(paste0(BASEDIR,"/downstream/hic/genome_loop_endPoints_hmmK562_table.txt"), header=F, sep="\t") %>% mutate(fraction=V3/V2, V4=gsub("^[0-9]+_","",V4)) %>% group_by(V1,V4) %>% summarize(K562=sum(fraction))
+# Merge in single DF
+genomeHMM_full <- merge(genomeEndHMM_Gm12878, genomeEndHMM_Hmec, by=c("V1","V4"), all=T) %>% merge(., genomeEndHMM_Huvec, by=c("V1","V4"), all=T) %>% merge(., genomeEndHMM_Nhek, by=c("V1","V4"), all=T) %>% merge(.,genomeEndHMM_K562, by=c("V1","V4"), all=T) %>% merge(., genomeEndHMM_H1hesc, by=c("V1","V4"), all=T) %>% merge(., genomeEndHMM_Hepg2, by=c("V1","V4"), all=T) %>% merge(., genomeEndHMM_Hsmm, by=c("V1","V4"), all=T) %>% merge(., genomeEndHMM_Nhlf, by=c("V1","V4"), all=T)
+genomeHMM_full[is.na(genomeHMM_full)] <- 0
+# Melt the data
+genomeHMM_full_melt <- melt(genomeHMM_full)
+
+# Rename the classes and summarise them
+genomeHMM_full_melt[genomeHMM_full_melt$V4 %in% c("Strong_Enhancer", "Weak_Enhancer"), "V4"] <- "Enhancer"
+genomeHMM_full_melt[genomeHMM_full_melt$V4 %in% c("Active_Promoter", "Weak_Promoter", "Poised_Promoter"), "V4"] <- "Promoter"
+genomeHMM_full_melt[genomeHMM_full_melt$V4 %in% c("Txn_Elongation", "Txn_Transition", "Weak_Txn"), "V4"] <- "Transcript"
+genomeHMM_full_melt[genomeHMM_full_melt$V4 %in% c("Repressed", "Insulator", "Repetitive/CNV", "Heterochrom/lo"), "V4"] <- "Other"
+genomeHMM_full_melt$V4 <- factor(genomeHMM_full_melt$V4, levels=c("Enhancer", "Promoter", "Transcript", "Other"))
+genomeHMM_full_melt <- filter(genomeHMM_full_melt) %>% group_by(V1, variable, V4) %>% summarize(value=sum(value))
+
+# Cast to matrix again to fill with 0s the missing values
+genomeHMM_full_matrix <- cast(genomeHMM_full_melt, V1~V4+variable, value="value", fill=0)
+# And melt again
+genomeHMM_full_matrix_melt <- melt(genomeHMM_full_matrix)
+
+# For each HMM category take all end-points and for each cell lines filter the one with the highest percentage.
+# The resulting DF means that the pcRNA end-point x has one loop (in one or more cell types) that is m% enhancer.
+allCategories <- unique(genomeHMM_full_melt$V4)
+
+linc_enrichment <- data.frame(Fraction=rep(seq(1,0,-0.1), length(allCategories)), N=NA, Tot=NA, Category=rep(allCategories, each=11))
+linc_allCat_percent <- list()
+for(cat in allCategories){
+        linc_max_cat_percent <- genomeHMM_full_matrix_melt[ genomeHMM_full_matrix_melt$V4 == cat,] %>% mutate(pc=gsub("chr[0-9XY]+(E|T.+)", "\\1", V1)) %>% group_by(V1) %>% summarize(m=max(value))
+	linc_allCat_percent[[cat]] <- linc_max_cat_percent
+        linc_enrichment[linc_enrichment$Category==cat, "Tot"] <- nrow(linc_max_cat_percent)
+
+        # Calculate how many pcRNA promoters are in contact with regions that are enhancer more than i%.
+        for(i in seq(1,0,-0.1)){
+                linc_enrichment[linc_enrichment$Category==cat & linc_enrichment$Fraction==i, "N"] <- sum(linc_max_cat_percent$m>=i)
+                linc_enrichment[linc_enrichment$Category==cat & linc_enrichment$Fraction==i, "Label"] <- paste(">=",i,sep="")
+        }
+}
+
+linc_max_percent <- mutate(genomeHMM_full_matrix_melt, pc=gsub("chr[0-9XY]+(E|T.+)", "\\1", V1)) %>% group_by(V1, V4) %>% summarize(m=max(value))
+
+# Merge the results
+pc_enrichment$Type <- "pcRNA"
+linc_enrichment$Type <- "Gencode lincRNA"
+
+allnumbers <- rbind(pc_enrichment, linc_enrichment)
+allnumbers$Label <- factor(allnumbers$Label, levels=unique(allnumbers$Label))
+
+# Do KS test
+p_values <- data.frame(Category=unique(allnumbers$Category), p=NA, p_label=NA)
+for( i in p_values$Category){
+	pval <- ks.test(pc_allCat_percent[[i]]$m, linc_allCat_percent[[i]]$m)$p.value
+	p_values[p_values$Category==i, "p"] <- pval
+	p_values[p_values$Category==i, "p_label"] <- paste("p-value=", format(pval, scientific=T, digits=3), sep="")
+}
+
+# Plot
+enhancer_numbersPlotControlled <- ggplot(allnumbers, aes(x=Label, y=N/Tot, colour=Type)) + geom_point(aes(group=Type)) + geom_path(aes(group=Type)) + xlab("Fraction of loop end annotated as enhancer") + ylab("Fraction of loops") + facet_wrap(~Category) + geom_text(data=p_values, aes(label=p_label), parse=T, x=6, y=0.5, colour="black", size=4)
+
+
+# Box plots <-
+
+linc_max_percent$Type <- "lincRNA"
+pc_max_percent$Type <- "pcRNA"
+all_max_percent <- rbind(pc_max_percent, linc_max_percent)
+```
+
+
+![Profiles of loop overlap in pcRNAs, pcRNA-associated coding genes, Gencode spliced lincs (5000 random) and Gencode protein coding genes (5000 random).](hic-fig/pcCoverageByLoops_profile.png)
+
+![Profiles of loop overlap in pcRNAs, pcRNA-associated coding genes, Gencode spliced lincs (5000 random) and Gencode protein coding genes (5000 random) centered on the TSS of pcRNAs](hic-fig/pcCoverageByLoop_promoters_profile.png)
+
+![Profiles of loop overlap in pcRNAs, divided by positional orientation.](hic-fig/pcCoverageByLoops_pcByPos_profile.png)
+
+
+```{r loopnAll, results="asis", fig.width=8, fig.height=8, fig.cap="Fraction of RNAs in each category (pcRNAs, Gencode lincRNAs, pcRNA-associated coding RNAs, Gencode coding RNAs) with a generic Loop (left plot, loops in both the introns and the exons) or exonic loop (right plot). The p-value for the enrichment has been calculated based on a hypergeometric distribution. Gencode lincRNAs were used as background for the pcRNA p-value and Gencode coding RNAs as background for pcRNA-associated coding RNAs. The HiC data has been obtained on Gm12878, HMEC, HUVEC, NHEK, K562, HeLa, KBM7, IMR90 cells."}
+loop_numbAll
+```
+
+```{r, results="asis"}
+kable(loops_sumAll)
+```
+
+Table showing the number of pcRNAs with loop (and exonic loop).
+
+
+```{r loopncatAll, results="asis", fig.width=8, fig.height=8, fig.cap="Fraction of pcRNAs in each orientation with a generic Loop (left plot, loops in both the introns and the exons) or exonic loop (right plot). The HiC data has been obtained on Gm12878, HMEC, HUVEC, NHEK, K562, HeLa, KBM7, IMR90 cells."}
+loop_numbCatAll
+```
+
+```{r loopprom, results="asis", fig.width=8, fig.height=8, fig.cap="Fraction of RNAs in each category (pcRNAs, Gencode lincRNAs, pcRNA-associated coding RNAs, Gencode coding RNAs) with a loop in their promoter (TSS+-2kb). The p-value for the enrichment has been calculated based on a hypergeometric distribution. Gencode spliced lincRNAs were used as background for the pcRNA p-value and Gencode coding RNAs as background for pcRNA-associated coding RNAs. The HiC data has been obtained on Gm12878 cells."}
+loop_numbPromoter
+```
+
+```{r, results="asis"}
+kable(loops_sumPromoter)
+```
+
+Table showing the number of pcRNAs with a promoter loop.
+
+```{r HMMFullPlot, results="asis", fig.width=10, fig.height=8, fig.cap="Heatmap showing the fraction of each pcRNA loop end-point annotated in the various Encode HMM categories. The rows are the end-points of the loops that fall in the pcRNA promoters. The columns are the various genomic segments annotated by the encode HMM segmentation in various cell lines. The colour coding indicates what proportion of each end-point is annotated as the corresponding category. The ordering of the rows is the same for all cell lines."}
+HMM_fullPlot
+```
+
+```{r enhancer_numbersPlot, results="asis", fig.width=8, fig.height=9, fig.cap="Bar plot showing the fraction of pcRNAs (y-axis) which are connected though a loop to a region that is annotated to an enhancer for at least x percent of its length (x-axis). The p value was calculated with the two-tails Kolmogorov-Smirnov test"}
+enhancer_numbersPlotControlled
+```
+
+
+```{r}
+# CTCF peaks
+# Plot ratio of pc with a promoter peak
+loops_sumPromoter_ctcf <- read.delim(paste0(BASEDIR,"/downstream/ctcf/CtcfOverlapPromoter/ctcf_contact_summary.txt"), header=T, sep=" ", strip.white=T) %>% mutate(FractionWithLoop=WithLoop/Total)
+loops_sumPromoter_ctcf$Category <- factor(loops_sumPromoter_ctcf$Category, levels=c("pcRNA", "lincRNAs", "pcCoding", "GencodeCoding"))
+
+#phyper(q, m, n, k, lower.tail = TRUE, log.p = FALSE)
+#q      vector of quantiles representing the number of white balls drawn without replacement from an urn which contains both black and white balls.
+#m      the number of white balls in the urn.
+#n      the number of black balls in the urn.
+#k      the number of balls drawn from the urn.
+
+
+p1 <- phyper(loops_sumPromoter_ctcf[1,2], loops_sumPromoter_ctcf[2,2], loops_sumPromoter_ctcf[2,3] - loops_sumPromoter_ctcf[2,2], loops_sumPromoter_ctcf[1,3], lower.tail=F)
+p2 <- phyper(loops_sumPromoter_ctcf[3,2], loops_sumPromoter_ctcf[4,2], loops_sumPromoter_ctcf[4,3] - loops_sumPromoter_ctcf[4,2], loops_sumPromoter_ctcf[3,3], lower.tail=T)
+
+annot_text <- data.frame(Category="pcRNA", y=loops_sumPromoter_ctcf[1,4]+0.025, p=p1)
+annot_text <- rbind(annot_text, data.frame(Category="pcCoding", y=loops_sumPromoter_ctcf[3,4]+0.025, p=p2))
+
+ctcf_numbPromoter <- ggplot(loops_sumPromoter_ctcf, aes(x=Category, y=FractionWithLoop, fill=Category)) + geom_bar(stat="identity")+ geom_text(data=annot_text, aes(x=Category, y=y, label=paste(pretty10exp2(p))), parse=T, size=3) + ylab("Ratio") + theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust=0.5))
+```
+
+### CTCF 
+```{r ctcfprom, results="asis", fig.width=8, fig.height=8, fig.cap="Fraction of RNAs in each category (pcRNAs, Gencode lincRNAs, pcRNA-associated coding RNAs, Gencode coding RNAs) with a CTCF binding site in their promoter (TSS+-2kb). The p-value for the enrichment has been calculated based on a hypergeometric distribution. Gencode spliced lincRNAs were used as background for the pcRNA p-value and Gencode coding RNAs as background for pcRNA-associated coding RNAs. The HiC data has been obtained on Gm12878 cells."}
+ctcf_numbPromoter
+```
+
+![Profiles of CTCF overlap in promoters of pcRNAs, pcRNA-associated coding genes, Gencode spliced lincs (5000 random) and Gencode protein coding genes (5000 random).](hic-fig/CTCF_coverage_profile.png)
+
+
+### TADs
+
+![Profiles of overlap of pcRNAs with the ends of TADs (end +/- 10kb).](hic-fig/pcCoverageByTADs_profile.png)
+
+```{r}
+# Plot ratio of pc with a promoter peak
+tads_sumPromoter <- read.delim(paste0(BASEDIR,"/downstream/hic-tads/TADOverlapAllLinesPromoter/TADs_contact_summary_10000kb.txt"), header=T, sep=" ", strip.white=T) %>% mutate(FractionWithLoop=WithLoop/Total)
+tads_sumPromoter$Category <- factor(tads_sumPromoter$Category, levels=c("pcRNA", "lincRNAs", "pcCoding", "GencodeCoding"))
+
+#phyper(q, m, n, k, lower.tail = TRUE, log.p = FALSE)
+#q      vector of quantiles representing the number of white balls drawn without replacement from an urn which contains both black and white balls.
+#m      the number of white balls in the urn.
+#n      the number of black balls in the urn.
+#k      the number of balls drawn from the urn.
+
+
+p1 <- phyper(tads_sumPromoter[1,2], tads_sumPromoter[2,2], tads_sumPromoter[2,3] - tads_sumPromoter[2,2], tads_sumPromoter[1,3], lower.tail=F)
+p2 <- phyper(tads_sumPromoter[3,2], tads_sumPromoter[4,2], tads_sumPromoter[4,3] - tads_sumPromoter[4,2], tads_sumPromoter[3,3], lower.tail=F)
+
+annot_text <- data.frame(Category="pcRNA", y=tads_sumPromoter[1,4]+0.025, p=p1)
+annot_text <- rbind(annot_text, data.frame(Category="pcCoding", y=tads_sumPromoter[3,4]+0.025, p=p2))
+
+tad_numbPromoter <- ggplot(tads_sumPromoter, aes(x=Category, y=FractionWithLoop, fill=Category)) + geom_bar(stat="identity")+ geom_text(data=annot_text, aes(x=Category, y=y, label=paste(pretty10exp2(p))), parse=T, size=3) + ylab("Ratio") + theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust=0.5))
+```
+
+```{r tadprom, results="asis", fig.width=8, fig.height=8, fig.cap="Fraction of RNAs in each category (pcRNAs, Gencode lincRNAs, pcRNA-associated coding RNAs, Gencode coding RNAs) whose promoter (TSS+-2kb) overlap a TAD end (+/-10kb). The p-value for the enrichment has been calculated based on a hypergeometric distribution. Gencode spliced lincRNAs were used as background for the pcRNA p-value and Gencode coding RNAs as background for pcRNA-associated coding RNAs. The HiC data has been obtained on Gm12878 cells."}
+tad_numbPromoter
+```
+
+```{r, tadpromall, results="asis", fig.width=8, fig.height=8, fig.cap="Fraction of RNAs whose promoter overlaps a TAD boundary +/- x Kbs"}
+tads_sumPromoterAll <- read.delim(paste0(BASEDIR,"/downstream/hic-tads/TADOverlapAllLinesPromoter/TADs_contact_summary_all.txt"), header=F, sep="\t", strip.white=T) 
+colnames(tads_sumPromoterAll) <- c("Size", "Category", "Number", "Total")
+
+tads_sumPromoterAll <- mutate(tads_sumPromoterAll, FractionWithLoop=Number/Total)
+ggplot(tads_sumPromoterAll, aes(x=Size, y=FractionWithLoop, group=Category, colour=Category)) + geom_line()
+
+```

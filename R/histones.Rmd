@@ -1,0 +1,142 @@
+## Analysis of histone modications in pcRNA promoters
+```{r set-options, echo=FALSE, cache=FALSE}
+        options(replace.assign=TRUE,width=70)
+        opts_chunk$set(dev=c("png","pdf"), dpi=300, fig.path='hist-fig/', cache.path='cache/hist-', par=TRUE, echo=FALSE, warning=F, message=F, cache=FALSE, results='hide', error=F)
+```
+
+```{r}
+library(ggplot2)
+library(dplyr)
+library(reshape)
+library("ggbiplot")
+source("functions.R")
+
+
+```
+
+```{r analyse}
+BASEDIR="/nfs/research2/enright/tom/projects/new-pcRNAs/analysis"
+load("report/data/pc_human_expAnalysis.Rdata.tmp")
+
+
+
+peaks<- read.delim(paste0(BASEDIR,"/nc/tfbs/histones/posConNC_promoters_clusters_allHistonePeak.bedx"), header=F, stringsAsFactors=F)
+peaks<- mutate(peaks, MidPeak=round(V8+(V9-V8)/2), MidProm=round(V2+(V3-V2)/2), RelDist=MidPeak-MidProm)
+peaks$Cell <- gsub("(Gm12878|K562|H1hesc).*","\\1",peaks$V10)
+peaks$Mod <- gsub("(Gm12878|K562|H1hesc)((H\\d+[Kk]\\d+(me|ac)\\d*)|P300)(Pk|StdPk.*)","\\2",peaks$V10,perl=T)
+peaks$Mod[peaks$Mod=="H3k04me1"] <- "H3k4me1"
+peaks$Mod[peaks$Mod=="H3k04me3"] <- "H3k4me3"
+peaks$Mod[peaks$Mod=="H3k09me3"] <- "H3k9me3"
+# This line excludes promoters with pcRNAs on both strands
+peaks <- peaks[peaks$V6=="+" | peaks$V6=="-",]
+# If the pc is on the - strand, change the sign of the distance
+peaks[peaks$Strand=="-", "RelDist"] <-  peaks[peaks$Strand=="-", "RelDist"] * -1
+
+peaks_cod <- read.delim(paste0(BASEDIR,"/nc/tfbs/histones/posConNC_promoters_clusters_allHistonePeak.bedx"), header=F, stringsAsFactors=F)
+peaks_cod <- mutate(peaks_cod, MidPeak=round(V8+(V9-V8)/2), MidProm=round(V2+(V3-V2)/2), RelDist=MidPeak-MidProm)
+peaks_cod$Cell <- gsub("(Gm12878|K562|H1hesc).*","\\1",peaks_cod$V10)
+peaks_cod$Mod <- gsub("(Gm12878|K562|H1hesc)((H\\d+[Kk]\\d+(me|ac)\\d*)|P300)(Pk|StdPk.*)","\\2",peaks_cod$V10,perl=T)
+peaks_cod$Mod[peaks_cod$Mod=="H3k04me1"] <- "H3k4me1"
+peaks_cod$Mod[peaks_cod$Mod=="H3k04me3"] <- "H3k4me3"
+peaks_cod$Mod[peaks_cod$Mod=="H3k09me3"] <- "H3k9me3"
+peaks_cod <- peaks_cod[peaks_cod$V6=="+" | peaks_cod$V6=="-",]
+peaks_cod[peaks_cod$Strand=="-", "RelDist"] <-  peaks_cod[peaks_cod$Strand=="-", "RelDist"] * -1
+
+
+
+
+
+prom_list <- select(pc, PCpromoterID, Orientation, Context, Strand)
+# Unique: if a promoter has multiple pcRNAs in different Context, keep all of them
+prom_list_unique <- unique(prom_list)
+peaks_short <- select(peaks, V4, V6, RelDist, Mod)
+peaks_cod_short <- select(peaks_cod, V4, V6, RelDist, Mod)
+
+pc_merged <- merge(peaks_short, prom_list_unique, by.x="V4", by.y="PCpromoterID")
+cod_merged <- merge(peaks_cod_short, prom_list_unique, by.x="V4", by.y="PCpromoterID")
+
+# These must be empy
+pc_merged[pc_merged$V6 != pc_merged$Strand,]
+
+
+peaks_2000 <- peaks[abs(peaks$RelDist)<2000,]
+
+a <- cast(V4~Mod, value="V13", data=peaks_2000, fun.aggregate=max, fill=0)
+
+a <- as.matrix(a)
+
+b <- unique(merge(rownames(a), pc[,c("PCpromoterID","Close GeneSym")], by=1))
+b <- cast(x~., data=b, value="Close GeneSym", fun.aggregate=function(x) paste(x,collapse=", "))
+row.names(b) <- b[,1]
+b <- b[row.names(a),]
+pca1<- prcomp(a, cor=TRUE, scale=T)
+
+
+# Do analysis on gencode coding and lincs
+peaks_gen_cod <- read.delim(paste0(BASEDIR,"/nc/tfbs/histones/encode-current_hsa_coding_promoters_clusters_allHistonePeak.bedx"), header=F, stringsAsFactors=F)
+peaks_gen_cod <- mutate(peaks_gen_cod, MidPeak=round(V8+(V9-V8)/2), MidProm=round(V2+(V3-V2)/2), RelDist=MidPeak-MidProm)
+peaks_gen_cod$Cell <- gsub("(Gm12878|K562|H1hesc).*","\\1",peaks_gen_cod$V10)
+peaks_gen_cod$Mod <- gsub("(Gm12878|K562|H1hesc)((H\\d+[Kk]\\d+(me|ac)\\d*)|P300)(Pk|StdPk.*)","\\2",peaks_gen_cod$V10,perl=T)
+peaks_gen_cod$Mod[peaks_gen_cod$Mod=="H3k04me1"] <- "H3k4me1"
+peaks_gen_cod$Mod[peaks_gen_cod$Mod=="H3k04me3"] <- "H3k4me3"
+peaks_gen_cod$Mod[peaks_gen_cod$Mod=="H3k09me3"] <- "H3k9me3"
+peaks_gen_cod <- peaks_gen_cod[peaks_gen_cod$V6=="+" | peaks_gen_cod$V6=="-",]
+peaks_gen_cod[peaks_gen_cod$Strand=="-", "RelDist"] <-  peaks_gen_cod[peaks_gen_cod$Strand=="-", "RelDist"] * -1
+
+
+# Do analysis on gencode lincs
+peaks_gen_linc <- read.delim(paste0(BASEDIR,"/nc/tfbs/histones/Gencode.v18.lincRNAs_promoters_clusters_allHistonePeak.bedx"), header=F, stringsAsFactors=F)
+peaks_gen_linc <- mutate(peaks_gen_linc, MidPeak=round(V8+(V9-V8)/2), MidProm=round(V2+(V3-V2)/2), RelDist=MidPeak-MidProm)
+peaks_gen_linc$Cell <- gsub("(Gm12878|K562|H1hesc).*","\\1",peaks_gen_linc$V10)
+peaks_gen_linc$Mod <- gsub("(Gm12878|K562|H1hesc)((H\\d+[Kk]\\d+(me|ac)\\d*)|P300)(Pk|StdPk.*)","\\2",peaks_gen_linc$V10,perl=T)
+peaks_gen_linc$Mod[peaks_gen_linc$Mod=="H3k04me1"] <- "H3k4me1"
+peaks_gen_linc$Mod[peaks_gen_linc$Mod=="H3k04me3"] <- "H3k4me3"
+peaks_gen_linc$Mod[peaks_gen_linc$Mod=="H3k09me3"] <- "H3k9me3"
+peaks_gen_linc <- peaks_gen_linc[peaks_gen_linc$V6=="+" | peaks_gen_linc$V6=="-",]
+peaks_gen_linc[peaks_gen_linc$Strand=="-", "RelDist"] <-  peaks_gen_linc[peaks_gen_linc$Strand=="-", "RelDist"] * -1
+
+
+
+
+```
+ChIP-Seq data from the ENCODE project (Broad Institute) was downloaded from the ENCODE portal on UCSC in the form of peak files. Peaks were then mapped to a non-overlapping set of pcRNA promoters (defined as a region of -2000/+2000 bp around their start sites). We then calculated the distance between the mid-point of each promoter (i.e. the pcRNA TSS) and the mid-point of each peak that overlaps with the promoter.
+Some promoters are shared by multiple pcRNAs, and in some instances different pcRNAs with the same promoter are on different strands of the genome. These were excluded from this analysis, because portions of the promoter that are upstream for one pcRNA would be downstream for the other, and vice-versa. Instead, when plotting the modifications splitting pcRNAs according to their genomic orientation, if the same promoter is shared by multiple pcRNAs with n genomic contexts, the promoter appears in each of the n plots for the corresponding contexts.
+
+```{r pc-point, results="asis", fig.width=8, fig.height=8, fig.cap="Scatter plot showing the position of Histon mark peaks relative to the TSS of pcRNAs. Each point indicates the distance of the peak from the closest promoter in Gm12878 and/or K562 and/or H1hESC"}
+ggplot(peaks, aes(x=RelDist, y=Mod, colour=Mod))+geom_point(alpha=0.1, position = position_jitter(height = 0.1)) + scale_x_continuous(limits=c(-2000,2000))
+```
+
+```{r pc-dens, results="asis", fig.width=8, fig.height=8, fig.cap="Density plot showing density of Histone mark peaks around pcRNA TSS."}
+ggplot(peaks, aes(x=RelDist, fill=Mod)) + geom_density(alpha=0.3) + scale_x_continuous(limits=c(-2000,2000)) + facet_wrap(~Mod) + theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust=0.5))
+```
+
+```{r pc-point, results="asis", fig.width=8, fig.height=8, fig.cap="Scatter plot showing the position of Histon mark peaks relative to the TSS of pcRNAs. Each point indicates the distance of the peak from the closest promoter in Gm12878, K562 and H1hESC"}
+ggplot(peaks, aes(x=RelDist, y=Mod, colour=Mod))+geom_point(alpha=0.1, position = position_jitter(height = 0.1)) + scale_x_continuous(limits=c(-2000,2000)) + facet_wrap(~Cell,ncol=1)
+```
+
+```{r pc-dens, results="asis", fig.width=6, fig.height=8, fig.cap="Density plot showing density of Histone mark peaks around pcRNA TSS, split by cell type."}
+ggplot(peaks, aes(x=RelDist, fill=Mod)) + geom_density(alpha=0.3) + scale_x_continuous(limits=c(-2000,2000)) + facet_grid(Mod~Cell) + theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust=0.5))
+```
+
+```{r pc-hist-cat, results="asis", fig.width=9, fig.height=11, fig.cap="Histograms showing density of Histone mark peaks around pcRNA TSS, split by genomic context. When two pcRNAs in different contexts share the same promoters they are are considered towards both categories."}
+ggplot(pc_merged, aes(x=RelDist, fill=Mod)) + geom_histogram(alpha=0.8) + scale_x_continuous(limits=c(-2000,2000)) + facet_grid(Mod~Context) + theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust=0.5))
+```
+
+```{r pc-hist-dens, results="asis", fig.width=9, fig.height=11, fig.cap="Density plot of Histone mark peaks around pcRNA TSS, split by genomic context. When two pcRNAs in different contexts share the same promoters they are are considered towards both categories."}
+ggplot(pc_merged, aes(x=RelDist, fill=Mod)) + geom_density(alpha=0.3) + scale_x_continuous(limits=c(-2000,2000)) + facet_grid(Mod~Context) + theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust=0.5))
+```
+
+```{r pca, results="asis", fig.cap="PCA biplot of histone mark profiles of pcRNA promoters"}
+ggbiplot(pca1,obs.scale = 1, var.scale = 1, groups=b$Context, labels=b[,2], labels.size=2)
+```
+
+```{r cd-point, results="asis", fig.width=8, fig.height=8, fig.cap="Scatter plot showing the position of Histon mark peaks relative to the TSS of protein coding genes associated with pcRNAs"}
+ggplot(peaks_cod, aes(x=RelDist, y=Mod, colour=Mod))+geom_point(alpha=0.1, position = position_jitter(height = 0.1)) + scale_x_continuous(limits=c(-2000,2000)) 
+```
+
+```{r cd-dens, results="asis", fig.width=8, fig.height=8, fig.cap="Density plot showing density of Histone mark peaks around TSS of protein coding genes associated with pcRNAs."}
+ggplot(peaks_cod, aes(x=RelDist, fill=Mod)) + geom_density(alpha=0.3) + scale_x_continuous(limits=c(-2000,2000)) + facet_wrap(~Mod) + theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust=0.5))
+```
+
+
+

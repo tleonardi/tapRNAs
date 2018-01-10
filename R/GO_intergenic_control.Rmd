@@ -1,0 +1,67 @@
+## GO enrichment analysis
+```{r set-options, echo=FALSE, cache=FALSE}
+        options(replace.assign=TRUE,width=70)
+        opts_chunk$set(dev=c("png","pdf"), dpi=300, fig.path='GO-fig/', cache.path='cache/GO-', par=TRUE, echo=FALSE, warning=F, message=F, cache=FALSE, results='hide', error=F)
+```
+
+```{r load-libs, cache=F}
+library("topGO")
+library("dplyr")
+library("org.Hs.eg.db")
+library("ggplot2")
+library("reshape")
+library("MatchIt)
+load("report/data/pc.Rdata")
+source("functions.R")
+
+```
+
+```{r Run analysis}
+BASEDIR="/nfs/research2/enright/tom/projects/new-pcRNAs/analysis"
+
+# Get list of all genes with synteny in mouse
+bgAnnot<- read.delim(paste(BASEDIR,"data/hg38ToMm10_orthologs_mart.txt", sep="/"), stringsAsFactors=F, header=F)
+
+bgGenes <- unique(bgAnnot[grepl("ENSMUSG", bgAnnot$V3),"V1"])
+
+# Load island size info
+bg_is <- read.delim(paste0(BASEDIR,"/downstream/GOcontrol/Gencode-current_hsa_coding_islandSize.txt"), stringsAsFactors=F, header=F)
+colnames(bg_is) <- c("Name", "Up", "Down", "Sum")
+
+# Get the list of genes associated with pcRNAs
+selectedGenes <-  unique(pc$"Closest Gene Gencode")
+
+bg_is$Type <- 0
+bg_is[bg_is$Name %in% selectedGenes, "Type"] <- 1
+
+
+bg_is_match <- matchit(Type~Sum, data=bg_is, ratio=5, method="nearest")
+
+bg_match <- match.data(bg_is_match)
+
+
+pdf("GO_intergenic_control.pdf")
+ggplot(bg_match, aes(fill=as.factor(Type), x=Sum)) + geom_density(alpha=0.1) + scale_x_log10()
+
+# Make the geneList for topGO
+geneList <- factor(bg_match$Type)
+names(geneList) <- bg_match$Name
+
+# Create topGO object
+data <- new("topGOdata", ontology = "BP", allGenes = geneList, annot = annFUN.org, ID = "ensembl", mapping="org.Hs.eg.db", nodeSize = 10)
+
+# Run test and correct p-vals
+resultFis.def <- runTest(data, statistic = "fisher")
+
+score(resultFis.def) <- p.adjust(score(resultFis.def), method="BH")
+
+
+allRes <- GenTable(data, Fisherdef = resultFis.def,  orderBy="Fisherdef", topNodes=20)
+allRes$Fisherdef <- as.numeric(allRes$Fisherdef)
+allRes$Term <- paste(allRes$Term,allRes$GO.ID)
+allRes$Term <- factor(allRes$Term, levels=allRes$Term[order(allRes$Significant/allRes$Annotated,decreasing=F)])
+
+ggplot(allRes[allRes$Fisherdef<0.2,], aes(y=Significant/Annotated,x=Term,colour=Fisherdef, size=Significant)) + geom_point(aes(order=desc(Fisherdef))) + scale_colour_gradient(name="p-value", low="red",high="yellow")   + coord_flip() + scale_size(range = c(3, 10))
+dev.off()
+```
+

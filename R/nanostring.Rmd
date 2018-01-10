@@ -1,0 +1,372 @@
+```{r set-options, echo=FALSE, cache=FALSE}
+        options(replace.assign=TRUE,width=70)
+        opts_chunk$set(dev=c("png","pdf"), dpi=300, fig.cap="", fig.path='nanostring-fig/', cache.path='cache/nanostring-', par=TRUE, echo=FALSE, warning=F, message=F, cache=FALSE, results='hide', error=F)
+	```
+
+```{r load-libs, cache=F}
+library(gdata)
+library(dplyr)
+library(RColorBrewer)
+library(gplots)
+library(reshape2)
+library(reshape)
+library(gridExtra)
+library(data.table)
+library(ggplot2)
+
+
+hmcol = colorRampPalette(brewer.pal(9, "GnBu"))(100)
+upPan <- function(...){
+	points(..., col = "darkblue")
+	abline(a=0, b=1, col = "red")
+}
+lowPan <- function(x, y, ...) {
+	r <- signif(cor(x, y), 2)
+par(usr = c(0, 1, 0, 1))
+rect(0, 0, 1,1, col = rev(heat.colors(100, alpha=0.3))[r*100])
+		text(0.5, 0.5 , r, cex = r^2*2)
+}
+```
+
+# Quality controls
+```{r}
+DATA="/homes/tl344/tom/projects/new-pcRNAs/data"
+data <- read.delim(paste0(DATA,"/nanostring/Nanostring_PCRNA-SET1-HS-MM_Data_norm.txt"), header=T, stringsAsFactors=F)
+
+samples_mm <- c("MmBrain.A", "MmBrain.B", "MmHeart.A", "MmHeart.B", "MmKidney.A", "MmKidney.B", "MmLiver.A", "MmLiver.B", "MmLung.A", "MmLung.B", "MmThymus.A", "MmThymus.B", "MmEye.A", "MmEye.B", "MmSpinalCord.A", "MmSpinalCord.B", "MmE7.A", "MmE7.B", "MmE11.A", "MmE11.B", "MmE15.A", "MmE15.B", "MmE17.A", "MmE17.B", "mESC.A", "mESC.B", "mESCD1.A", "mESCD1.B", "mESCD3.A", "mESCD3.B", "mESCD6.A", "mESCD6.B", "X4T1A", "X4T1B")
+
+samples_hs <- c("HsBrain.A", "HsBrain.B", "HsHeart.A", "HsHeart.B", "HsKidney.A", "HsKidney.B", "HsLiver.A", "HsLiver.B", "HsLung.A", "HsLung.B", "HsThymus.A", "HsThymus.B", "HsCervix.A", "HsCervix.B", "HsOvary.A", "HsOvary.B", "HsPlacenta.A", "HsPlacenta.B", "HsProstate.A", "HsProstate.B", "HsTestis.A", "HsTestis.B", "NT2.A", "NT2.B", "NT2D1.A", "NT2D1.B", "NT2D3.A", "NT2D3.B", "WI38.A", "WI38.B", "MCF10A.A", "MCF10A.B", "MCF7.A", "MCF7.B", "MDA.MB.231.A", "MDA.MB.231.B", "BT474.A", "BT474.B", "OVCAR3.A", "OVCAR3.B", "LNCaP.A", "LNCaP.B", "PC3.A", "PC3.B", "LuCAP.A", "LuCAP.B", "U251MG.A", "U251MG.B", "C33A.A", "C33A.B", "H522.A", "H522.B", "U2OS.A", "U2OS.B", "MRC5.A", "MRC5.B", "H1299.A", "H1299.B", "A549.A", "A549.B", "Huh7.A", "Huh7.B")
+
+
+data_hs <- data[, c("Type", "ID", "Name", samples_hs)]
+data_mm <- data[, c("Type", "ID", "Name", samples_mm)]
+
+negative_hs <- filter(data_hs, Type=="Negative") %>%
+  select(-Type, -ID, -Name)
+negative_mm <- filter(data_mm, Type=="Negative") %>%
+  select(-Type, -ID, -Name)
+
+
+max(unlist(negative_mm))
+# sum(apply(hs_matrix,1,max)<quantile(unlist(negative_hs), 0.9))
+# sum(apply(mm_matrix,1,max)<quantile(unlist(negative_mm), 0.9))
+
+
+# POSITIVE CONTROLS
+positive_hs <- filter(data_hs, Type=="Positive") %>%
+				select(-Type, -ID, -Name)
+positive_mm <- filter(data_mm, Type=="Positive") %>%
+				select(-Type, -ID, -Name)
+
+positive_hs$Concentration <- c(128, 32, 8, 2, 0.5, 0.125)
+positive_mm$Concentration <- c(128, 32, 8, 2, 0.5, 0.125)
+
+
+positive_hs <- melt(positive_hs, id="Concentration")
+positive_hs$rep <- gsub(".+\\.([A|B])", "\\1",positive_hs$variable)
+positive_hs$variable <- gsub("\\.[A|B]$", "",positive_hs$variable)
+positive_hs <- group_by(positive_hs, Concentration, variable) %>%
+  summarise(mean=mean(value), max=max(value), min=min(value))
+
+positive_mm <- melt(positive_mm, id="Concentration")
+positive_mm$rep <- gsub(".+\\.([A|B])", "\\1",positive_mm$variable)
+positive_mm$variable <- gsub("\\.[A|B]$", "",positive_mm$variable)
+positive_mm <- group_by(positive_mm, Concentration, variable) %>%
+  summarise(mean=mean(value), max=max(value), min=min(value))
+```
+
+
+```{r, fig.cap="Expression of human positive controls"}
+ggplot(positive_hs, aes(x=log2(Concentration), y=mean, ymin=min, ymax=max)) + geom_pointrange(position = position_jitter(), aes(colour=variable)) + coord_trans(y="log2") +ylab("Counts") + ggtitle("Human positive controls")
+```
+
+```{r, fig.cap="Expression of mouse positive controls"}
+ggplot(positive_mm, aes(x=log2(Concentration), y=mean, ymin=min, ymax=max)) + geom_pointrange(position = position_jitter(), aes(colour=variable)) + coord_trans(y="log2") +ylab("Counts") + ggtitle("Mouse positive controls")
+```
+
+```{r}
+hk_hs <- filter(data_hs, Type=="Housekeeping", grepl("^Hs", ID))
+hk_mm <- filter(data_mm, Type=="Housekeeping", grepl("^Mm", ID))
+
+hk_hs <- melt(hk_hs)
+hk_mm <- melt(hk_mm)
+
+hk_hs_cv <- hk_hs %>%
+group_by(ID) %>%
+summarise(mean=mean(value), sd=sd(value))
+
+hk_mm_cv <- hk_mm %>%
+group_by(ID) %>%
+summarise(mean=mean(value), sd=sd(value))
+
+hk_hs$rep <- gsub(".+\\.([A|B])", "\\1",hk_hs$variable)
+hk_hs$variable <- gsub("\\.[A|B]$", "",hk_hs$variable)
+hk_hs <- group_by(hk_hs, ID, variable) %>%
+  summarise(mean=mean(value), max=max(value), min=min(value))
+
+hk_mm$rep <- gsub(".+\\.([A|B])", "\\1",hk_mm$variable)
+hk_mm$variable <- gsub("\\.[A|B]$", "",hk_mm$variable)
+hk_mm <- group_by(hk_mm, ID, variable) %>%
+  summarise(mean=mean(value), max=max(value), min=min(value))
+```
+
+```{r fig.width=12, fig.cap="Expression of human houskeeping genes"}
+print(ggplot(hk_hs, aes(x=variable, y=mean, ymin=min, ymax=max, colour=ID)) + geom_pointrange(position=position_jitter()) + facet_wrap(~ID, scales="free") + theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust=0.5, size=8)) + ggtitle("Human housekeeping"))
+```
+
+```{r fig.width=10, fig.cap="Expression of mouse houskeeping genes"}
+print(ggplot(hk_mm, aes(x=variable, y=mean, ymin=min, ymax=max, colour=ID)) + geom_pointrange(position=position_jitter()) + facet_wrap(~ID, scales="free") + theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust=0.5, size=8)) + ggtitle("Mouse housekeeping"))
+```
+
+```{r fig.cap="Coefficient of variation of human houskeeping genes"}
+ggplot(hk_hs_cv,aes(x=ID, y=sd/mean, colour=ID))+ geom_point() + ggtitle("Human housekeeping genes CV") + ylab("CV") + theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust=0.5, size=8))
+```
+
+```{r fig.cap="Coefficient of variation of mouse houskeeping genes"}
+ggplot(hk_mm_cv,aes(x=ID, y=sd/mean, colour=ID))+ geom_point() + ggtitle("Mouse housekeeping genes CV") + ylab("CV") + theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust=0.5, size=8))
+```
+
+```{r}
+targets_hs <- filter(data_hs, Type=="Endogenous", grepl("^Hs", ID))
+targets_mm <- filter(data_mm, Type=="Endogenous", grepl("^Mm", ID))
+# The protein coding is mistakenly named "Hs_HNF4A-BT_1"
+targets_hs[targets_hs$Name=="ENST00000372920.1","ID"] <- "Hs_HNF4A"
+targets_mm[targets_mm$Name=="ENSMUST00000018094.1","ID"] <- "Mm_HNF4A"
+targets_hs[targets_hs$Name=="ENST00000452481.1","ID"] <- "Hs_HNF4A-BT"
+targets_mm[targets_mm$Name=="ENSMUST00000128896.1","ID"] <- "Mm_HNF4A-BT"
+targets_hs[targets_hs$ID=="Hs_Sox1","ID"] <- "Hs_SOX1"
+targets_mm[targets_mm$ID=="Mm_SOX2OT","ID"] <- "Mm_SOX2-OT"
+targets_mm[targets_mm$ID=="Mm_Sox1","ID"] <- "Mm_SOX1"
+
+
+annot <- read.delim("/homes/tl344/tom/projects/new-pcRNAs/data/nanostring/nano_annot.txt", stringsAsFactors=F)
+annot <- dplyr::arrange(annot, Plot)
+```
+
+```{r fig.width=10, fig.height=10, fig.cap="Expression heatmap of human pcRNAs"}
+# Make a matrix of human pcRNAs and coding partners
+pc_hs_matrix <- filter(targets_hs, ID %in% paste("Hs", c(annot$Symbol), sep="_")) %>%
+  select(-(c(Type,Name)))
+row.names(pc_hs_matrix) <- pc_hs_matrix$ID
+pc_hs_matrix <- pc_hs_matrix[,-1]
+heatmap.2(log2(as.matrix(pc_hs_matrix)), trace="none", margins=c(8,12), col=hmcol, density="none", main="Human pcRNA expression")
+```
+
+```{r fig.width=10, fig.height=10,fig.cap="Expression heatmap of human pcRNA-associated coding genes"}
+cd_hs_matrix <- filter(targets_hs, ID %in% paste("Hs", c(annot$Coding), sep="_")) %>%
+  select(-(c(Type,Name)))
+row.names(cd_hs_matrix) <- cd_hs_matrix$ID
+cd_hs_matrix <- cd_hs_matrix[,-1]
+heatmap.2(log2(as.matrix(cd_hs_matrix)), trace="none", margins=c(8,12), col=hmcol, density="none", main="Human coding expression", cexRow=0.5, cexCol=0.5)
+```
+
+```{r fig.cap="Heatmap of Spearman correlation of tissue expression profiles for human pcRNAs and coding genes"}
+hs_matrix <- select(targets_hs, -(c(Type,Name)))
+row.names(hs_matrix) <- hs_matrix$ID
+hs_matrix <- hs_matrix[,-1]
+
+# Average the replicates
+hs_matrix_mean <- reshape2::melt(as.matrix(hs_matrix)) %>% dplyr::mutate(X2=gsub("\\.[AB]", "", X2)) %>% cast(X1~X2, value="value", fun.aggregate=mean)
+row.names(hs_matrix_mean) <- hs_matrix_mean$X1
+hs_matrix_mean <- hs_matrix_mean[,-1]
+heatmap.2(cor(hs_matrix_mean, method="spearman"), trace="none", margins=c(8,12), col=hmcol, density="none", main="Human tissue correlation", cexRow=1, cexCol=1, labRow=colnames(hs_matrix_mean), labCol=colnames(hs_matrix_mean))
+```
+
+```{r fig.width=10, fig.height=10, fig.cap="Expression heatmap of human pcRNAs and coding genes after avaraging replicates"}
+heatmap.2(log2(as.matrix(hs_matrix_mean)), trace="none", margins=c(8,12), col=hmcol, density="none", main="Human pcRNA expression", labRow=row.names(hs_matrix_mean), labCol=colnames(hs_matrix_mean))
+```
+
+```{r fig.width=10, fig.height=10, fig.cap="Expression heatmap of human pcRNAs in cancer cell lines"}
+
+hs_matrix_mean_pcOnly_cancerOnly <- hs_matrix_mean[row.names(hs_matrix_mean) %in% paste("Hs", c(annot$Symbol), sep="_"), !grepl("^Hs", colnames(hs_matrix_mean))]
+heatmap.2(log2(as.matrix(hs_matrix_mean_pcOnly_cancerOnly)), trace="none", margins=c(8,12), col=hmcol, density="none", main="Human pcRNA expression in cancer", labRow=row.names(hs_matrix_mean_pcOnly_cancerOnly), labCol=colnames(hs_matrix_mean_pcOnly_cancerOnly))
+```
+
+```{r fig.width=12, fig.height=12,fig.cap="Heatmap of euclidean distance of human pcRNA and coding gene expression across tissues"}
+eu_dist <- t(scale(t(hs_matrix_mean)))
+heatmap.2(as.matrix(dist(eu_dist)), trace="none", margins=c(8,12), col=rev(hmcol), density="none", main="Human transcript correlation", cexRow=0.4, cexCol=0.4, labRow=row.names(hs_matrix_mean), labCol=row.names(hs_matrix_mean))
+```
+
+```{r fig.width=12, fig.height=12,fig.cap="Heatmap of Pearson correlation of human pcRNA and coding gene expression across tissues"}
+heatmap.2(cor(t(hs_matrix_mean)), trace="none", margins=c(8,12), col=hmcol, density="none", main="Human transcript correlation", cexRow=0.4, cexCol=0.4, labRow=row.names(hs_matrix_mean), labCol=row.names(hs_matrix_mean))
+```
+
+```{r fig.width=12, fig.height=12,fig.cap="Heatmap of Spearman correlation of human pcRNA and coding gene expression across tissues"}
+heatmap.2(cor(t(hs_matrix_mean), method="spearman"), trace="none", margins=c(8,12), col=hmcol, density="none", main="Human transcript correlation", cexRow=0.4, cexCol=0.4, labRow=row.names(hs_matrix_mean), labCol=row.names(hs_matrix_mean))
+```
+
+```{r fig.width=10, fig.height=10,fig.cap="Expression heatmap of mouse pcRNAs"}
+# Make a matrix of mouse pcRNAs and coding partners
+pc_mm_matrix <- filter(targets_mm, ID %in% paste("Mm", c(annot$Symbol), sep="_")) %>%
+  select(-(c(Type,Name)))
+row.names(pc_mm_matrix) <- pc_mm_matrix$ID
+pc_mm_matrix <- pc_mm_matrix[,-1]
+heatmap.2(log2(as.matrix(pc_mm_matrix)), trace="none", margins=c(8,12), col=hmcol, density="none", main="Mouse pcRNA expression", cexRow=0.5, cexCol=0.5)
+```
+
+```{r fig.width=10, fig.height=10,fig.cap="Expression heatmap of mouse pcRNA-associated coding genes"}
+cd_mm_matrix <- filter(targets_mm, ID %in% paste("Mm", c(annot$Coding), sep="_")) %>%
+  select(-(c(Type,Name)))
+row.names(cd_mm_matrix) <- cd_mm_matrix$ID
+cd_mm_matrix <- cd_mm_matrix[,-1]
+heatmap.2(log2(as.matrix(cd_mm_matrix)), trace="none", margins=c(8,12), col=hmcol, density="none", main="Mouse coding expression", cexRow=0.5, cexCol=0.5)
+```
+
+```{r fig.cap="Heatmap of Spearman correlation of tissue expression profiles for mouse pcRNAs and coding genes"}
+mm_matrix <- select(targets_mm, -(c(Type,Name)))
+row.names(mm_matrix) <- mm_matrix$ID
+mm_matrix <- mm_matrix[,-1]
+mm_matrix_mean <- reshape2::melt(as.matrix(mm_matrix)) %>% dplyr::mutate(X2=gsub("\\.[AB]", "", X2)) %>% cast(X1~X2, value="value", fun.aggregate=mean)
+row.names(mm_matrix_mean) <- mm_matrix_mean$X1
+mm_matrix_mean <- mm_matrix_mean[,-1]
+heatmap.2(cor(mm_matrix_mean, method="spearman"), trace="none", margins=c(8,12), col=hmcol, density="none", main="Mouse tissue correlation", cexRow=1, cexCol=1, labCol=colnames(mm_matrix_mean), labRow=colnames(mm_matrix_mean))
+```
+
+```{r fig.width=12, fig.height=12,fig.cap="Heatmap of euclidean distance of mouse pcRNA and coding gene expression across tissues"}
+eu_dist_mm <- t(scale(t(mm_matrix_mean)))
+heatmap.2(as.matrix(dist(eu_dist_mm)), trace="none", margins=c(8,12), col=rev(hmcol), density="none", main="Mouse transcript correlation", cexRow=0.4, cexCol=0.4, labCol=row.names(mm_matrix_mean), labRow=row.names(mm_matrix_mean))
+```
+
+```{r fig.width=12, fig.height=12,fig.cap="Heatmap of Pearson correlation of mouse pcRNA and coding gene expression across tissues"}
+heatmap.2(cor(t(mm_matrix_mean)), trace="none", margins=c(8,12), col=hmcol, density="none", main="Mouse transcript correlation", cexRow=0.4, cexCol=0.4, labCol=row.names(mm_matrix_mean), labRow=row.names(mm_matrix_mean))
+```
+
+```{r fig.width=12, fig.height=12,fig.cap="Heatmap of Pearson correlation of mouse pcRNA and coding gene expression across tissues"}
+heatmap.2(cor(t(mm_matrix_mean), method="spearman"), trace="none", margins=c(8,12), col=hmcol, density="none", main="Mouse transcript correlation", cexRow=0.4, cexCol=0.4, labCol=row.names(mm_matrix_mean), labRow=row.names(mm_matrix_mean))
+```
+
+
+```{r, fig.cap="Distribution of Spearman's Rho between human pcRNAs and corresponding coding genes. The shaded courve curve shows the background correlations between all possible combinations of pcRNAs and coding genes."}
+# Extract the coding a non coding matrix in the same order
+hs_coding_sorted <- hs_matrix_mean[annot[grepl("Hs", annot$CodingID), "CodingID"],]
+hs_pc_sorted <- hs_matrix_mean[annot[grepl("Hs", annot$ID), "ID"],]
+# Calculate correlation matrices 
+hs_pc_cd_cor_mat_r <- cor(t(hs_coding_sorted), t(hs_pc_sorted), method="pearson")
+hs_pc_cd_cor_mat_rho <- cor(t(hs_coding_sorted), t(hs_pc_sorted), method="spearman")
+hs_pc_cd_cor <- data.frame(R = diag(hs_pc_cd_cor_mat_r), Rho = diag(hs_pc_cd_cor_mat_rho))
+# Permutation test
+hs_mh_rho_perm <- replicate(1000000, mean(sample(hs_pc_cd_cor_mat_rho, ncol(hs_pc_cd_cor_mat_rho), replace=T), na.rm=T))
+hs_mh_rho_pval <- mean(hs_mh_rho_perm>=mean(diag(hs_pc_cd_cor_mat_rho), na.rm=T))
+# Plot
+ggplot(hs_pc_cd_cor, aes(x=Rho)) + geom_density() + geom_density(data=data.frame(BG=as.numeric(hs_pc_cd_cor_mat_rho)), aes(x=BG), fill="black", alpha=0.2)
+```
+
+Mean rho: `r mean(hs_pc_cd_cor$Rho, na.rm=T)`; Median rho: `r median(hs_pc_cd_cor$Rho, na.rm=T)`; p-value `r hs_mh_rho_pval`
+
+```{r, fig.cap="Distribution of Spearman's Rho between mouse pcRNAs and corresponding coding genes. The shaded courve curve shows the background correlations between all possible combinations of pcRNAs and coding genes."}
+# Extract the coding a non coding matrix in the same order
+mm_coding_sorted <- mm_matrix_mean[annot[grepl("Mm", annot$CodingID), "CodingID"],]
+mm_pc_sorted <- mm_matrix_mean[annot[grepl("Mm", annot$ID), "ID"],]
+# Calculate correlation matrices 
+mm_pc_cd_cor_mat_r <- cor(t(mm_coding_sorted), t(mm_pc_sorted), method="pearson")
+mm_pc_cd_cor_mat_rho <- cor(t(mm_coding_sorted), t(mm_pc_sorted), method="spearman")
+mm_pc_cd_cor <- data.frame(R = diag(mm_pc_cd_cor_mat_r), Rho = diag(mm_pc_cd_cor_mat_rho))
+# Permutation test
+mm_mh_rho_perm <- replicate(1000000, mean(sample(mm_pc_cd_cor_mat_rho, ncol(mm_pc_cd_cor_mat_rho), replace=T), na.rm=T))
+mm_mh_rho_pval <- mean(mm_mh_rho_perm>=mean(diag(mm_pc_cd_cor_mat_rho), na.rm=T))
+# Plot
+ggplot(mm_pc_cd_cor, aes(x=Rho)) + geom_density() + geom_density(data=data.frame(BG=as.numeric(mm_pc_cd_cor_mat_rho)), aes(x=BG), fill="black", alpha=0.2)
+```
+
+Mean rho: `r mean(mm_pc_cd_cor$Rho, na.rm=T)`; Median rho: `r median(mm_pc_cd_cor$Rho, na.rm=T)`; p-value `r mm_mh_rho_pval`
+
+```{r, fig.cap="Distribution of Spearman's Rho between human and mouse pcRNAs. The shaded courve curve shows the background correlations between all possible combinations of pcRNAs and coding genes."}
+# Extract the coding a non coding matrix in the same order
+
+hs2mm <- read.table("/homes/tl344/tom/projects/new-pcRNAs/data/nanostring/nano_human2mouse_annot.txt", sep="\t", header=T, stringsAsFactors=F)
+
+hs_coding_bothsorted <- hs_matrix_mean[hs2mm$ID.x, c("HsBrain", "HsHeart", "HsKidney", "HsLiver", "HsLung", "HsThymus")]
+mm_coding_bothsorted <- mm_matrix_mean[hs2mm$ID.y, c("MmBrain", "MmHeart", "MmKidney", "MmLiver", "MmLung", "MmThymus")]
+
+
+# Calculate correlation matrices
+hs_mm_cor_mat_r <- cor(t(hs_coding_bothsorted), t(mm_coding_bothsorted), method="pearson")
+hs_mm_cor_mat_rho <- cor(t(hs_coding_bothsorted), t(mm_coding_bothsorted), method="spearman")
+hs_mm_cor <- data.frame(R = diag(hs_mm_cor_mat_r), Rho = diag(hs_mm_cor_mat_rho))
+# Permutation test
+hs_mm_rho_perm <- replicate(1000000, mean(sample(hs_mm_cor_mat_rho, ncol(hs_mm_cor_mat_rho), replace=T), na.rm=T))
+hs_mm_rho_pval <- mean(hs_mh_rho_perm>=mean(diag(hs_mm_cor_mat_rho), na.rm=T))
+# Plot
+ggplot(hs_mm_cor, aes(x=Rho)) + geom_density() + geom_density(data=data.frame(BG=as.numeric(hs_mm_cor_mat_rho)), aes(x=BG), fill="black", alpha=0.2)
+```
+
+Mean rho: `r mean(hs_mm_cor$Rho, na.rm=T)`; Median rho: `r median(hs_mm_cor$Rho, na.rm=T)`; p-value `r hs_mm_rho_pval`
+
+# Expression profiles of individual pcRNAs and coding genes
+```{r, fig.width=12, results="asis"}
+human_tissues <- c("HsBrain", "HsHeart", "HsKidney", "HsLiver", "HsLung", "HsThymus", "HsCervix", "HsOvary", "HsPlacenta", "HsProstate", "HsTestis")
+human_cancer <- c("NT2", "NT2D1", "NT2D3", "WI38", "MCF10A", "MCF7", "MDA.MB.231", "BT474", "OVCAR3", "LNCap", "PC3", "LuCAP", "U251MG", "C33A", "H522", "U2OS", "MRC5", "H1299", "A549", "Huh7")
+mouse_tissues <- c("MmBrain", "MmHeart", "MmKidney", "MmLiver", "MmLung", "MmThymus", "MmEye", "MmSpinalCord")
+mouse_dev <- c("MmE7", "MmE11", "MmE15", "MmE17", "mESC", "mESCD1", "mESCD3", "mESCD6", "X4T1A")
+
+
+
+for(i in unique(annot$Plot)){
+  cat("\n\n##", i, "\n\n")
+  a <- filter(annot, Plot==i)
+  hs <- filter(targets_hs, ID %in% paste("Hs", c(a$Symbol, a$Coding), sep="_")) %>%
+    select(-(c(Type,Name)))
+  hs <- melt(hs)
+  hs$rep <- gsub(".+\\.([A|B])", "\\1",hs$variable)
+  hs$variable <- gsub("\\.[A|B]$", "",hs$variable)
+  hs <- group_by(hs, ID, variable) %>%
+    summarise(mean=mean(value), max=max(value), min=min(value))
+  
+  hs_tis <- hs[hs$variable %in% human_tissues, ]
+  hs_tis$variable <- factor(gsub("^Hs", "", hs_tis$variable), levels=gsub("^Hs", "", human_tissues))
+  p1 <- ggplot(hs_tis, aes(x=variable, group=ID, y=mean, colour=ID, ymin=min, ymax=max)) +geom_pointrange() + geom_line() + ggtitle("Human tissues") + scale_y_log10() + theme_set(theme_gray(base_size = 12)) + theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust=0.5))
+  
+  hs_canc <- hs[hs$variable %in% human_cancer, ]
+  hs_canc$variable <- factor(gsub("^Hs", "", hs_canc$variable), levels=gsub("^Hs", "", human_cancer))
+  p2 <- ggplot(hs_canc, aes(x=variable, group=ID, y=mean, colour=ID, ymin=min, ymax=max)) +geom_pointrange() + geom_line() + ggtitle("Human cancer") + theme_set(theme_gray(base_size = 12)) + theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust=0.5)) + scale_y_log10()
+  
+  
+  mm <- filter(targets_mm, ID %in% paste("Mm", c(a$Symbol, a$Coding), sep="_")) %>%
+    select(-(c(Type,Name)))
+  mm <- melt(mm)
+  mm$rep <- gsub(".+\\.([A|B])", "\\1",mm$variable)
+  mm$variable <- gsub("\\.[A|B]$", "",mm$variable)
+  mm <- group_by(mm, ID, variable) %>%
+    summarise(mean=mean(value), max=max(value), min=min(value))
+  
+  
+  mm_tis <- mm[mm$variable %in% mouse_tissues, ]
+  mm_tis$variable <- factor(gsub("^Mm", "", mm_tis$variable), levels=gsub("^Mm", "", mouse_tissues))
+  p3 <- ggplot(mm_tis, aes(x=variable, group=ID, y=mean, colour=ID, ymin=min, ymax=max)) +geom_pointrange() + geom_line() + ggtitle("Mouse tissues") + scale_y_log10() + theme_set(theme_gray(base_size = 12)) + theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust=0.5))
+
+  mm_dev <- mm[mm$variable %in% mouse_dev, ]
+  mm_dev$variable <- factor(gsub("^Mm", "", mm_dev$variable), levels=gsub("^Mm", "", mouse_dev))
+  p4 <- ggplot(mm_dev, aes(x=variable, group=ID, y=mean, colour=ID, ymin=min, ymax=max)) +geom_pointrange() + geom_line() + ggtitle("Mouse Development and differentiation") + scale_y_log10() + theme_set(theme_gray(base_size = 12)) + theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust=0.5))
+  
+  grid.arrange(p1,p3,p2,p4,main=paste(unique(unlist(a$Coding)), collapse=", "))
+
+  # Calculate correlations between RNAs
+  combs <- expand.grid(a[grepl("Hs", a[,"ID"]),1], a[grepl("Mm", a[,"ID"]),1])
+  correlations <- data.frame(A=rep(NA,nrow(a)+nrow(combs)) , B=rep(NA,nrow(a)+nrow(combs)), cor=rep(NA,nrow(a)+nrow(combs)))
+  # First coding-pcRNA
+}
+```
+
+# Correlation heatmaps
+```{r, results="asis"}
+for(i in unique(annot$Plot)){
+  cat("\n\n##", i, "\n\n")
+  a <- filter(annot, Plot==i)
+  all_exp <- as.data.frame(rbindlist(
+    list(filter(targets_hs, ID %in% a[grepl("Hs", a[,"ID"]),"ID"]) %>% select(ID, HsBrain.A,HsBrain.B,HsHeart.A,HsHeart.B,HsKidney.A,HsKidney.B,HsLiver.A,HsLiver.B,HsLung.A,HsLung.B,HsThymus.A,HsThymus.B),
+    filter(targets_hs, ID %in% a[grepl("Hs", a[,"ID"]),"CodingID"]) %>% select(ID, HsBrain.A,HsBrain.B,HsHeart.A,HsHeart.B,HsKidney.A,HsKidney.B,HsLiver.A,HsLiver.B,HsLung.A,HsLung.B,HsThymus.A,HsThymus.B),
+    filter(targets_mm, ID %in% a[grepl("Mm", a[,"ID"]),"ID"]) %>% select(ID, MmBrain.A,MmBrain.B,MmHeart.A,MmHeart.B,MmKidney.A,MmKidney.B,MmLiver.A,MmLiver.B,MmLung.A,MmLung.B,MmThymus.A,MmThymus.B),
+    filter(targets_mm, ID %in% a[grepl("Mm", a[,"ID"]),"CodingID"]) %>% select(ID, MmBrain.A,MmBrain.B,MmHeart.A,MmHeart.B,MmKidney.A,MmKidney.B,MmLiver.A,MmLiver.B,MmLung.A,MmLung.B,MmThymus.A,MmThymus.B)), use.names=F)
+    )
+  row.names(all_exp) <- all_exp$ID
+  cor_mat <- reshape::melt(cor(t(select(all_exp, -ID)), method="spearman"))
+  print(ggplot(cor_mat, aes(x=X1, y=X2, fill=value, label=round(value,2))) + geom_tile() + geom_text(size=3, fontface="bold") + scale_fill_gradientn(colours=hmcol, name="Spearman rho") + theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust=0.5)) + xlab("") + ylab("") + ggtitle(paste("Correlations of ", i)))
+}
+```
+
+```{r}
+# Save data
+write.table(hs_matrix_mean, file="report/data/nanostring_hs_exp.txt", row.names=T, quote=F, sep="\t")
+```
+
+

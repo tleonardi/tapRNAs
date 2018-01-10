@@ -1,0 +1,203 @@
+## Expression analysis of mouse pcRNAs
+
+```{r set-options, echo=FALSE, cache=FALSE}
+        options(replace.assign=TRUE,width=70)
+        opts_chunk$set(dev=c("png","pdf"), dpi=300, fig.path='mouseExp-fig/', cache.path='cache/mousExp-', par=TRUE, echo=FALSE, warning=F, message=F, cache=FALSE, results='hide', error=F)
+```
+
+```{r load-libs, cache=F}
+library("ggplot2")
+library("reshape")
+library("gplots")
+library("RColorBrewer")
+hmcol = colorRampPalette(brewer.pal(9, "GnBu"))(100)
+
+load("report/data/pc_human_expAnalysis.Rdata")
+load("report/data/hsa_nc_exp.Rdata")
+load("report/data/mmu_nc_exp.Rdata")
+load("report/data/mouse2human.Rdata")
+
+source("functions.R")
+
+```
+
+```{r mouse-exp-analysis}
+##########################
+#       Mouse           ##
+##########################
+colnames(mmu_nc_exp) <- gsub("_FPKM", "", colnames(mmu_nc_exp))
+colnames(hsa_nc_exp) <- gsub("_FPKM", "", colnames(hsa_nc_exp))
+
+
+mmu_nc_exp_mean <- mmu_nc_exp
+thr <- 0
+mmu_nc_exp_mean_filt <- mmu_nc_exp_mean[apply(mmu_nc_exp_mean,1,max)>thr,]
+mmu_nc_exp_mean_melt <- melt(data.frame(Name=row.names(mmu_nc_exp_mean_filt),mmu_nc_exp_mean_filt))
+colnames(mmu_nc_exp_mean_melt) <- c("Name", "Tissue", "FPKM")
+
+hsa_nc_exp_mean <- hsa_nc_exp
+thr_hsa <- 0
+hsa_nc_exp_mean_filt <- hsa_nc_exp_mean[apply(hsa_nc_exp_mean,1,max)>thr_hsa,]
+
+
+mmu_meanAndMax <- t(apply(mmu_nc_exp,1,function(x) c(mean(x),max(x))))
+colnames(mmu_meanAndMax) <- c("Mean", "Max")
+mmu_meanAndMax <- mmu_meanAndMax[mmu_meanAndMax[,2]>thr,]
+mmu_meanAndMax <- melt(mmu_meanAndMax)
+colnames(mmu_meanAndMax) <- c("Name", "Type", "FPKM")
+
+# Calculate tissue specificity
+mmu_tissue_specificity <- as.data.frame(t(apply(mmu_nc_exp_mean_filt, 1, tissueScore)), stringsAsFactors=F)
+colnames(mmu_tissue_specificity) <- c("maxTissue", "Score", "maxFPKM")
+mmu_tissue_specificity$Score <- as.numeric(mmu_tissue_specificity$Score)
+mmu_tissue_specificity$maxFPKM <- as.numeric(mmu_tissue_specificity$maxFPKM)
+mmu_tissue_specificity$maxTissue <- as.factor(mmu_tissue_specificity$maxTissue)
+mmu_tissue_specificity <- mmu_tissue_specificity[,c("Score", "maxTissue", "maxFPKM")]
+
+score_mmu <- val2col(mmu_tissue_specificity[row.names(mmu_nc_exp_mean_filt), "Score"], col=colorRampPalette(brewer.pal(9, "YlOrRd"))(100))
+
+# Set tissue colors for row side colors of the heatmap
+max_tis_mmu <- mmu_tissue_specificity[row.names(mmu_nc_exp_mean_filt), "maxTissue"]
+tissues_mmu <- levels(max_tis_mmu)
+levels(max_tis_mmu) <- colorRampPalette(brewer.pal(9, "Set1"))(length(levels(max_tis_mmu)))
+
+# Correlation of expression between mouse and human
+tmp_m2h<- merge(mouse2human, mmu_nc_exp_mean_filt[,c("C2C12", "CH12", "MEL", "ESpA", "br", "cb", "ht", "kd", "lv", "ts")], by.x="mmu-pcTCONSid", by.y=0)
+
+mAndH<- merge(tmp_m2h, hsa_nc_exp_mean_filt[c("Hsmm", "GM12878", "K562", "EScepA", "br", "cb", "ht", "kd", "lv", "ts")], by.x="Human", by.y=0, all.x=T)
+
+m_matrix <- as.matrix(mAndH[,4:13])
+row.names(m_matrix) <- mAndH[,"mmu-pcTCONSid"]
+
+h_matrix <- as.matrix(mAndH[,14:ncol(mAndH)])
+row.names(h_matrix) <- mAndH[,"Human"]
+
+mh_rho <- data.frame(Human=row.names(h_matrix), mh_rho=diag(cor(t(h_matrix),t(m_matrix), method="spearman")))
+
+mh_rho_cor <- cor(t(h_matrix),t(m_matrix), method="spearman")
+mh_rho_perm <- replicate(1000000, mean(sample(mh_rho_cor, ncol(mh_rho_cor), replace=T), na.rm=T))
+mh_rho_pval <- mean(mh_rho_perm>=mean(diag(mh_rho_cor), na.rm=T))
+mh_rho_cor_df <- data.frame(Background_rho=as.numeric(mh_rho_cor))
+mh_r <- data.frame(Human=row.names(h_matrix), mh_r=diag(cor(t(h_matrix),t(m_matrix))))
+
+pc_mh <- merge(pc, mh_rho, by.x="pcTCONSid", by.y="Human")
+pc_mh <- merge(pc_mh, mh_r, by.x="pcTCONSid", by.y="Human")
+
+mmu_tissue_specificity_fullInfo <- merge(mouse2human, mmu_tissue_specificity, by.x="mmu-pcTCONSid", by.y=0)
+write.table(mmu_tissue_specificity_fullInfo, file="report/data/mmu_tissue_specificity.txt", sep="\t", quote=F, row.names=F)
+```
+
+### General expression analysis
+```{r meanMaxmmu, fig.cap="Distribution of the Mean and Max FPKMs (log2) of each mouse pcRNA across tissues. pcRNAs with Max FPKM <thr have been excluded from this plot."}
+ggplot(mmu_meanAndMax, aes(x=Type, y=log2(FPKM))) + geom_boxplot(alpha=0.4) + ggtitle("FPKM distribution for mouse pcRNAs") + ylab("log2 FPKM")
+```
+
+```{r expression-density-mmu, fig.cap="Distribution of mouse pcRNA expression (log2FPKM) across tissues."}
+ggplot(mmu_nc_exp_mean_melt[mmu_nc_exp_mean_melt$FPKM>thr,], aes(log2(FPKM), fill=Tissue)) + geom_density(alpha=0.3) + facet_wrap(~Tissue)
+```
+```{r expression-density-mmu2, fig.cap="Distribution of mouse pcRNA expression (log2FPKM) across tissues. The minimum FPKM!=0 was added to pcRNAs with FPKM=0 in order to plot them on a log scale."}
+min_FPKM <- min(mmu_nc_exp_mean_melt[mmu_nc_exp_mean_melt$FPKM!=0, "FPKM"])
+ggplot(mmu_nc_exp_mean_melt, aes(log2(FPKM+min_FPKM), fill=Tissue)) + geom_density(alpha=0.3) + facet_wrap(~Tissue)
+```
+
+```{r expression-box-mmu, fig.cap="Distribution of mouse pcRNA expression (log2FPKM) across tissues."}
+ggplot(mmu_nc_exp_mean_melt[mmu_nc_exp_mean_melt$FPKM>thr,], aes(y=log2(FPKM), x=Tissue,fill=Tissue)) + geom_boxplot(alpha=0.3) + theme(axis.text.x = element_blank())
+```
+
+```{r expression-box-mmu2, fig.cap="Distribution of mouse pcRNA expression (log2FPKM) across tissues. The minimum FPKM!=0 was added to pcRNAs with FPKM=0 in order to plot them on a log scale."}
+ggplot(mmu_nc_exp_mean_melt, aes(y=log2(FPKM+min_FPKM), x=Tissue,fill=Tissue)) + geom_boxplot(alpha=0.3) + theme(axis.text.x = element_blank())
+```
+
+```{r NC-heatmaps-mmu, fig.cap="Heatmap showing log2 FPKM values for mouse pcRNAs across tissues.  The minimum FPKM!=0 was added to pcRNAs with FPKM=0 in order to plot them on a log scale. pcRNAs with 0 FPKMs in all samples were removed"}
+heatmap.2(log2(as.matrix(mmu_nc_exp_mean_filt+min_FPKM)), scale="none", trace="none", density="none", Rowv=T, Colv=T, margins=c(10,10), col=hmcol, labRow=NA)
+```
+
+```{r NC-heatmaps-mmu-zscore, fig.cap="Heatmap showing z-scores FPKM values for mouse pcRNAs across tissues. pcRNAs with 0 FPKMs in all samples were removed"}
+heatmap.2(as.matrix(mmu_nc_exp_mean_filt), labCol=colnames(mmu_nc_exp_mean), scale="row", trace="none", density="none", Rowv=T, Colv=T, margins=c(10,10), col=hmcol, labRow=NA)
+```
+
+### Tissue specificity and correlation of expression
+
+```{r NC-pearson-tissue-mmu, fig.cap="Heatmap showing pair-wise Pearson correlation coefficient between pcRNA expression across tissues. pcRNAs with 0 FPKMs in all samples were removed"}
+heatmap.2(cor(mmu_nc_exp_mean_filt), scale="none", dendrogram="column", trace="none", density="none", labRow=colnames(mmu_nc_exp_mean), labCol=colnames(mmu_nc_exp_mean), margins=c(10,10), col=hmcol)
+```
+
+```{r NC-spearman-tissue-mmu, fig.cap="Heatmap showing pair-wise Spearman correlation coefficient between tissues. pcRNAs with 0 FPKMs in all samples were removed"}
+heatmap.2(cor(mmu_nc_exp_mean_filt, method="spearman"), scale="none", dendrogram="column", trace="none", density="none", labRow=colnames(mmu_nc_exp_mean), labCol=colnames(mmu_nc_exp_mean), margins=c(10,10), col=hmcol)
+```
+
+```{r NC-pearson-pc-mmu, fig.cap="Heatmap showing pair-wise Pearson correlation coefficient between tissues. The yellow-to-red bar at the top indicates the tissue specificty score of each pcRNAs, with yellow being 0 and red being 1. pcRNAs with no expression in any tissue were removed", global.device=TRUE }
+heatmap.2(cor(t(mmu_nc_exp_mean_filt)), scale="none", dendrogram="column", trace="none", density="none", labRow="", labCol="", margins=c(2,2), col=hmcol, ColSideColors=score_mmu, RowSideColors=as.character(max_tis_mmu))
+legend("bottomleft",legend=as.character(tissues_mmu), fill=as.character(levels(max_tis_mmu)), border=FALSE, bty="n", y.intersp = 0.9, cex=0.7, title="Tissues")
+```
+
+```{r NC-dist-pc-mmu, fig.cap="Heatmap showing pair-wise Euclidean distance between tissues. pcRNAs with no expression in any tissue were removed", global.device=TRUE }
+eu_dist <- t(scale(t(mmu_nc_exp_mean_filt)))
+heatmap.2(as.matrix(dist(eu_dist)), scale="none", dendrogram="column", trace="none", density="none", labRow="", labCol="", margins=c(2,2), col=rev(hmcol), RowSideColors=as.character(max_tis_mmu))
+legend("bottomleft",legend=as.character(tissues_mmu), fill=as.character(levels(max_tis_mmu)), border=FALSE, bty="n", y.intersp = 0.9, cex=0.7, title="Tissues")
+```
+
+```{r NC-spearman-pc-mmu, fig.cap="Heatmap showing pair-wise Spearman correlation coefficient between pcRNA. The yellow-to-red bar at the top indicates the tissue specificty score of each pcRNAs, with yellow being 0 and red being 1. pcRNAs with no expression in any tissue were removed", global.device=TRUE }
+heatmap.2(cor(t(mmu_nc_exp_mean_filt), method="spearman"), scale="none", dendrogram="column", trace="none", density="none", labRow="", labCol="", margins=c(2,2), col=hmcol, ColSideColors=score_mmu, RowSideColors=as.character(max_tis_mmu))
+legend("bottomleft",legend=as.character(tissues_mmu), fill=as.character(levels(max_tis_mmu)), border=FALSE, bty="n", y.intersp = 0.9, cex=0.7, title="Tissues")
+```
+
+
+```{r tiss-spec-mmu, fig.cap="Tissue specificity score of each mouse pcRNA against its max FPKM across tissues"}
+ggplot(mmu_tissue_specificity, aes(y=Score, x=maxFPKM)) + geom_point() + scale_x_log10() + ggtitle("Tissue specificity score")
+```
+
+```{r tiss-spec-byTiss-mmu, fig.cap="Tissue specificity score of each mouse pcRNA against its max FPKM across tissues, by tissues"}
+ggplot(mmu_tissue_specificity[!is.na(mmu_tissue_specificity$maxTissue), ], aes(y=Score, x=maxFPKM, colour=maxTissue)) + geom_point() + scale_x_log10() + facet_wrap("maxTissue") + ggtitle("Tissue specificity score")
+```
+
+```{r tiss-spec-byTiss-mmu-dens, fig.cap="Distribution of tissue specificity scores of each mouse pcRNA."}
+ggplot(mmu_tissue_specificity[!is.na(mmu_tissue_specificity$maxTissue), ], aes(Score, fill=maxTissue)) + geom_density(alpha=0.5) + facet_wrap(~maxTissue)
+```
+
+### Correlation of expression between human and mouse pcRNAs
+In all plots in this section human pcRNAs that have two or more corresponding transcripts in mouse are considered multiples times (i.e. as multiple points in the plots).
+
+```{r mh-rho, fig.cap="Distribution of Spearman correlation coefficients between human and mouse pcRNAs."}
+ggplot(pc_mh, aes(mh_rho)) + geom_density(fill="black", alpha=0.2) + xlab("Spearman rho") + geom_density(data=mh_rho_cor_df, aes(Background_rho), alpha=0.2, adjust=3)
+```
+Mean rho: `r mean(pc_mh$mh_rho, na.rm=T)`; Median rho: `r median(pc_mh$mh_rho, na.rm=T)`; p-value `r mh_rho_pval`
+
+```{r mh-r, fig.cap="Distribution of Pearson correlation coefficients between human and mouse pcRNAs."}
+ggplot(pc_mh, aes(mh_r)) + geom_density() + xlab("Pearson r")
+```
+
+```{r mh-rho-tis, fig.cap="Distribution of Spearman correlation coefficients between human and mouse pcRNAs, divided by tissue with the maximal expression of the human pcRNA."}
+ggplot(pc_mh[!is.na(pc_mh$maxTisPC),], aes(mh_rho, fill=maxTisPC)) + geom_density(alpha=0.6) + xlab("Spearman rho") + facet_wrap(~maxTisPC)
+```
+
+```{r mh-r-tis, fig.cap="Distribution of Pearson correlation coefficients between human and mouse pcRNAs, divided by tissue with the maximal expression of the human pcRNA."}
+ggplot(pc_mh[!is.na(pc_mh$maxTisPC),], aes(mh_r, fill=maxTisPC)) + geom_density(alpha=0.6) + xlab("Pearson r") + facet_wrap(~maxTisPC)
+```
+
+```{r mh-rho-cat, fig.cap="Distribution of Spearman correlation coefficients between human and mouse pcRNAs divided by positional context."}
+ggplot(pc_mh, aes(y=mh_rho, x=Context)) + geom_boxplot() + ylab("Spearman rho")
+```
+
+```{r mh-r-cat, fig.cap="Distribution of Pearson correlation coefficients between human and mouse pcRNAs divided by positional context."}
+ggplot(pc_mh, aes(y=mh_r, x=Context)) + geom_boxplot() + ylab("Pearson r")
+```
+
+```{r mh-rho-fp, fig.cap="Scatterplot of Spearman correlation coefficients between human and mouse pcRNAs plotted against the maximum FPKM of the human pcRNA"}
+ggplot(pc_mh, aes(x=log2(maxFpkmPC), y=mh_rho)) + geom_point() + ylab("Spearman rho")
+```
+
+```{r mh-r-fp, fig.cap="Scatterplot of Pearson correlation coefficients between human and mouse pcRNAs plotted against the maximum FPKM of the human pcRNA"}
+ggplot(pc_mh, aes(x=log2(maxFpkmPC), y=mh_r)) + geom_point() + ylab("Pearson r")
+```
+
+```{r mh-r-spec, fig.cap="Scatterplot of Pearson correlation coefficients between human and mouse pcRNAs plotted against the tissue specificity score of the human pcRNA"}
+ggplot(pc_mh, aes(y=tisSpecPC, x=mh_r)) + geom_point() + ylab("Tissue spec score") + xlab("Pearson r") + facet_wrap(~maxTisPC)
+```
+
+```{r mh-rho-spec, fig.cap="Scatterplot of Spaerman correlation coefficients between human and mouse pcRNAs plotted against the tissue specificity score of the human pcRNA"}
+ggplot(pc_mh, aes(y=tisSpecPC, x=mh_rho)) + geom_point() + ylab("Tissue spec score") + xlab("Spearman rho") + facet_wrap(~maxTisPC)
+```
+
+
+

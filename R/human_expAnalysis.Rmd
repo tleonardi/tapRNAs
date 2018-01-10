@@ -1,0 +1,424 @@
+##Expression analysis of human pcRNAs
+
+```{r set-options, echo=FALSE, cache=FALSE}
+        options(replace.assign=TRUE,width=70)
+        opts_chunk$set(dev=c("png","pdf"), dpi=300, fig.path='humanExp-fig/', cache.path='cache/humanExp-', par=TRUE, echo=FALSE, warning=F, message=F, cache=FALSE, results='hide', error=F)
+```
+
+```{r load-libs, cache=F}
+library("ggplot2")
+library("plyr")
+library("dplyr")
+library("reshape")
+library("gplots")
+library("RColorBrewer")
+library("scales")
+library("MatchIt")
+hmcol = colorRampPalette(brewer.pal(9, "GnBu"))(100)
+
+load("report/data/pc.Rdata")
+load("report/data/hsa_nc_exp.Rdata")
+load("report/data/hsa_cd_exp.Rdata")
+source("functions.R")
+
+```
+
+
+```{r human-exp-analysis}
+colnames(hsa_nc_exp) <- gsub("_FPKM", "", colnames(hsa_nc_exp))
+colnames(hsa_cd_exp) <- gsub("_FPKM", "", colnames(hsa_cd_exp))
+
+### pcRNAs
+hsa_nc_exp_mean <- hsa_nc_exp
+
+thr <- 0
+# Filter RNAs with exp <thr in all tissues
+hsa_nc_exp_mean_filt <- hsa_nc_exp_mean[apply(hsa_nc_exp_mean,1,max)>thr,]
+hsa_nc_exp_mean_melt <- melt(data.frame(Name=row.names(hsa_nc_exp_mean_filt),hsa_nc_exp_mean_filt))
+colnames(hsa_nc_exp_mean_melt) <- c("Name", "Tissue", "FPKM")
+
+hsa_meanAndMax <- t(apply(hsa_nc_exp,1,function(x) c(mean(x),max(x))))
+colnames(hsa_meanAndMax) <- c("Mean", "Max")
+hsa_meanAndMax <- hsa_meanAndMax[hsa_meanAndMax[,2]>thr,]
+hsa_meanAndMax <- melt(hsa_meanAndMax)
+colnames(hsa_meanAndMax) <- c("Name", "Type", "FPKM")
+
+### CODING
+# Extract expression of coding genes
+# 16 of the pc[,"Closest Gene Gencode"] are absent from hsa_tracking
+# Therefore the will be 16 NA rows in hsa_cd_exp
+hsa_cd_exp_mean <- hsa_cd_exp
+hsa_cd_exp_mean_filt <- hsa_cd_exp_mean[apply(hsa_cd_exp_mean,1,max)>thr,]
+
+
+### TISSUE SPECIFICITY SCORE
+# Calculate score of pcRNAs
+hsa_tissue_specificity <- as.data.frame(t(apply(hsa_nc_exp_mean_filt, 1, tissueScore)), stringsAsFactors=F)
+colnames(hsa_tissue_specificity) <- c("maxTissue", "Score", "maxFPKM")
+hsa_tissue_specificity$Score <- as.numeric(hsa_tissue_specificity$Score)
+hsa_tissue_specificity$maxFPKM <- as.numeric(hsa_tissue_specificity$maxFPKM)
+hsa_tissue_specificity$maxTissue <- as.factor(hsa_tissue_specificity$maxTissue)
+hsa_tissue_specificity <- hsa_tissue_specificity[,c("Score", "maxTissue", "maxFPKM")]
+
+# Calculate score for coding
+hsa_tissue_specificity_cd <- as.data.frame(t(apply(hsa_cd_exp_mean_filt, 1, tissueScore)), stringsAsFactors=F)
+colnames(hsa_tissue_specificity_cd) <- c("maxTissue", "Score", "maxFPKM")
+hsa_tissue_specificity_cd$Score <- as.numeric(hsa_tissue_specificity_cd$Score)
+hsa_tissue_specificity_cd$maxFPKM <- as.numeric(hsa_tissue_specificity_cd$maxFPKM)
+hsa_tissue_specificity_cd$maxTissue <- as.factor(hsa_tissue_specificity_cd$maxTissue)
+hsa_tissue_specificity_cd <- hsa_tissue_specificity_cd[,c("Score", "maxTissue", "maxFPKM")]
+
+
+hsa_tissue_specificity_pc_and_coding <- rbind(data.frame(hsa_tissue_specificity, type=1), data.frame(hsa_tissue_specificity_cd,type=0))
+hsa_tissue_specificity_pc_and_coding$type <- as.factor(hsa_tissue_specificity_pc_and_coding$type)
+spec_class <- matchit(type~maxFPKM, data=hsa_tissue_specificity_pc_and_coding, method="subclass", subclass=5, sub.by="control")
+hsa_tissue_specificity_pc_and_coding_subclass<- match.data(spec_class)
+
+# Make a colour scale based on the score
+score_hsa <- val2col(hsa_tissue_specificity[row.names(hsa_nc_exp_mean_filt), "Score"], col=colorRampPalette(brewer.pal(9, "YlOrRd"))(100))
+
+# Set tissue colors for row side colors of the heatmap
+max_tis_hsa <- hsa_tissue_specificity[row.names(hsa_nc_exp_mean_filt), "maxTissue"]
+tissues_hsa <- levels(max_tis_hsa)
+levels(max_tis_hsa) <- colorRampPalette(brewer.pal(9, "Set1"))(length(levels(max_tis_hsa)))
+
+pc <- merge(pc, hsa_tissue_specificity, by.x="pcTCONSid", by.y=0, all.x=T)
+colnames(pc)[(ncol(pc)-2):ncol(pc)] <- c("tisSpecPC", "maxTisPC", "maxFpkmPC")
+
+pc <- merge(pc, hsa_tissue_specificity_cd, by.x="Closest Gene Gencode", by.y=0, all.x=T)
+colnames(pc)[(ncol(pc)-2):ncol(pc)] <- c("tisSpecCD", "maxTisCD", "maxFpkmCD")
+
+combined_specificity <- pc[,c("Name", "Closest Gene Gencode", "tisSpecCD", "maxTisCD", "maxFpkmCD", "tisSpecPC", "maxTisPC", "maxFpkmPC")]
+colnames(combined_specificity) <- c("pcName", "codingName", "codScore", "codMaxTis", "codMaxFPKM", "pcScore", "pcMaxTis", "pcMaxFPKM")
+
+#####################################################
+# Correlation coefficients between coding and pcRNAs
+#####################################################
+
+# We need to enforce the same order in the matrices of coding and pc
+# so that pairs appear in the same columns
+pc2codID <- pc[,c("pcTCONSid", "Closest Gene Gencode")]
+nc_and_cd_tmp <- merge(hsa_nc_exp_mean_filt, pc2codID, by.x=0, by.y=1, all.y=T)
+nc_and_cd <- merge(nc_and_cd_tmp, hsa_cd_exp_mean_filt, by.x="Closest Gene Gencode", by.y=0, all=T)
+# X is the pcRNA, Y is the coding
+# Remove rows containg any NAs (NAs arising from the filtering)
+nc_and_cd <- nc_and_cd[!is.na(apply(nc_and_cd[3:ncol(nc_and_cd)],1,max)),]
+
+# Split the DF between pc and cod. We keep the pc IDs as row.names in both cases
+pc_matrix <- as.matrix(nc_and_cd[,3:(3+ncol(hsa_nc_exp_mean)-1)])
+row.names(pc_matrix) <- nc_and_cd[,2]
+
+cd_matrix <- as.matrix(nc_and_cd[,(3+ncol(hsa_nc_exp_mean)):ncol(nc_and_cd)])
+row.names(cd_matrix) <- nc_and_cd[,2]
+
+pc_cd_rho_cor <- cor(t(pc_matrix),t(cd_matrix), method="spearman")
+pc_cd_rho <- diag(pc_cd_rho_cor)
+
+pc_cd_rho_perm <- replicate(1000000, mean(sample(pc_cd_rho_cor, ncol(pc_cd_rho_cor), replace=T), na.rm=T))
+pc_cd_rho_pval <- mean(pc_cd_rho_perm>=mean(diag(pc_cd_rho_cor), na.rm=T))
+
+pc_cd_rho_df <- data.frame(Background_rho=as.numeric(pc_cd_rho_cor))
+
+pc_cd_r <- diag(cor(t(pc_matrix),t(cd_matrix), method="pearson"))
+
+pc <- merge(pc,as.data.frame(pc_cd_rho, row.names=names(pc_cd_rho)), by.x="pcTCONSid", by.y=0, all.x=T)
+pc <- merge(pc,as.data.frame(pc_cd_r, row.names=names(pc_cd_r)), by.x="pcTCONSid", by.y=0, all.x=T)
+save(pc, file="report/data/pc_human_expAnalysis.Rdata")
+save(hsa_nc_exp_mean, file="report/data/hsa_nc_exp_mean.Rdata")
+write.table(pc, file="report/data/pc_human_expAnalysis.txt", sep="\t", quote=F, row.names=F)
+```
+
+```{r exp-go}
+# GO Enrichment analysis based on tissue specificity
+library("topGO")
+library("org.Hs.eg.db")
+
+tis_list <-list()
+meanScore <- mean(combined_specificity$pcScore, na.rm=T)
+
+tis_list["br"] <- list(filter(combined_specificity, pcMaxTis=="br", pcScore>meanScore) %>% .[["codingName"]])
+tis_list["cb"]<- list(filter(combined_specificity, pcMaxTis=="cb", pcScore>meanScore) %>% .[["codingName"]])
+tis_list["EScepA"]<- list(filter(combined_specificity, pcMaxTis=="EScepA", pcScore>meanScore) %>% .[["codingName"]])
+tis_list["EScypA"]<- list(filter(combined_specificity, pcMaxTis=="EScypA", pcScore>meanScore) %>% .[["codingName"]])
+tis_list["ESnupA"]<- list(filter(combined_specificity, pcMaxTis=="ESnupA", pcScore>meanScore) %>% .[["codingName"]])
+tis_list["GM12878"]<- list(filter(combined_specificity, pcMaxTis=="GM12878", pcScore>meanScore) %>% .[["codingName"]])
+tis_list["Hsmm"]<- list(filter(combined_specificity, pcMaxTis=="Hsmm", pcScore>meanScore) %>% .[["codingName"]])
+tis_list["ht"]<- list(filter(combined_specificity, pcMaxTis=="ht", pcScore>meanScore) %>% .[["codingName"]])
+tis_list["K562"]<- list(filter(combined_specificity, pcMaxTis=="K562", pcScore>meanScore) %>% .[["codingName"]])
+tis_list["kd"]<- list(filter(combined_specificity, pcMaxTis=="kd", pcScore>meanScore) %>% .[["codingName"]])
+tis_list["lv"]<- list(filter(combined_specificity, pcMaxTis=="lv", pcScore>meanScore) %>% .[["codingName"]])
+tis_list["ts"]<- list(filter(combined_specificity, pcMaxTis=="ts", pcScore>meanScore) %>% .[["codingName"]])
+bgGenes <- unique(combined_specificity[,2])
+
+allRes <- list()
+for(TIS in names(tis_list)){
+geneList <- factor(as.integer( bgGenes %in% tis_list[[TIS]]))
+names(geneList) <- bgGenes
+
+# Create topGO object
+data <- new("topGOdata", ontology = "BP", allGenes = geneList, annot = annFUN.org, ID = "ensembl", mapping="org.Hs.eg.db")
+
+# Run test and correct p-vals
+resultFis.clas <- runTest(data, algorithm = "classic", statistic = "fisher")
+resultFis.def <- runTest(data, statistic = "fisher")
+allRes[[TIS]] <- GenTable(data, Fisherclassic = resultFis.clas, Fisherdef = resultFis.def,  orderBy="Fisherdef", topNodes=20)
+allRes[[TIS]]$Fisherclassic <- as.numeric(allRes[[TIS]]$Fisherclassic)
+allRes[[TIS]]$Fisherdef <- as.numeric(allRes[[TIS]]$Fisherdef)
+allRes[[TIS]]$Term <- paste(allRes[[TIS]]$Term,allRes[[TIS]]$GO.ID)
+allRes[[TIS]]$Term <- factor(allRes[[TIS]]$Term, levels=allRes[[TIS]]$Term[order(allRes[[TIS]]$Fisherdef, decreasing=T)])
+
+allGO = genesInTerm(data)
+my_annotation= lapply(allGO,function(x) x[x %in% tis_list[[TIS]]] )
+sig_tab <- allRes[[TIS]]
+sig_tab$genes <- apply(sig_tab,1,function(x) paste(unique(unlist(pc[pc[,"Closest Gene Gencode"] %in% my_annotation[[x[1]]], "Close GeneSym"])), collapse=", "))
+write.table(sig_tab, paste("report/data/GO/byTissue/GOEnrichment_",TIS,".txt", sep=""), quote=F, sep="\t")
+}
+```
+
+### General expression analysis
+```{r meanMaxhsa, fig.cap="Distribution of the Mean and Max FPKMs (log2) of each human pcRNA across tissues. pcRNAs with Max FPKM=0 have been excluded from this plot."}
+ggplot(hsa_meanAndMax, aes(x=Type, y=log2(FPKM))) + geom_boxplot(alpha=0.4) + ggtitle("FPKM distribution for human pcRNAs") + ylab("log2 FPKM")
+```
+
+```{r expression-density-hsa, fig.cap="Distribution of human pcRNA expression (log2FPKM) across tissues. pcRNAs with FPKM=0 have been excluded from each subplot."}
+ggplot(hsa_nc_exp_mean_melt[hsa_nc_exp_mean_melt$FPKM>thr,], aes(log2(FPKM), fill=Tissue)) + geom_density(alpha=0.3) + facet_wrap(~Tissue)
+```
+
+```{r expression-density-hsa2, fig.cap="Distribution of human pcRNA expression (log2FPKM) across tissues. The minimum FPKM!=0 was added to pcRNAs with FPKM=0 in order to plot them on a log scale"}
+min_FPKM <- min(hsa_nc_exp_mean_melt[hsa_nc_exp_mean_melt$FPKM!=0, "FPKM"])
+ggplot(hsa_nc_exp_mean_melt, aes(log2(FPKM+min_FPKM), fill=Tissue)) + geom_density(alpha=0.3) + facet_wrap(~Tissue)
+```
+
+```{r expression-box-hsa, fig.cap="Distribution of human pcRNA expression (log2FPKM) across tissues. pcRNAs with Max FPKM=0 have been excluded from this plot."}
+ggplot(hsa_nc_exp_mean_melt[hsa_nc_exp_mean_melt$FPKM>thr,], aes(y=log2(FPKM), x=Tissue,fill=Tissue)) + geom_boxplot(alpha=0.3) + theme(axis.text.x = element_blank())
+```
+
+```{r expression-box-hsa2, fig.cap="Distribution of human pcRNA expression (log2FPKM) across tissues. The minimum FPKM!=0 was added to pcRNAs with FPKM=0 in order to plot them on a log scale."}
+ggplot(hsa_nc_exp_mean_melt, aes(y=log2(FPKM+min_FPKM), x=Tissue,fill=Tissue)) + geom_boxplot(alpha=0.3) + theme(axis.text.x = element_blank())
+```
+
+```{r NC-heatmaps-hsa, fig.cap="Heatmap showing log2 FPKM values for human pcRNAs across tissues. The minimum FPKM!=0 was added to pcRNAs with FPKM=0 in order to plot them on a log scale. The yellow-to-red bar indicates the tissue specificty score of each pcRNAs, with yellow being 0 and red being 1."}
+heatmap.2(log2(as.matrix(hsa_nc_exp_mean_filt+min_FPKM)), scale="none", trace="none", density="none", Rowv=T, Colv=T, margins=c(6,6), labRow=NA, col=hmcol, RowSideCol=score_hsa)
+```
+
+```{r NC-heatmaps-hsa-zscore, fig.cap="Heatmap showing z-scores FPKM values for human pcRNAs across tissues. pcRNAs with 0 FPKMs in all samples were removed"}
+heatmap.2(as.matrix(hsa_nc_exp_mean_filt), labCol=colnames(hsa_nc_exp_mean_filt), labRow=NA, scale="row", trace="none", density="none", Rowv=T, Colv=T, margins=c(6,6), col=hmcol)
+```
+
+```{r NC-pearson-tissue-hsa, fig.cap="Heatmap showing pair-wise Pearson correlation coefficient between pcRNA expression across tissues. pcRNAs with 0 FPKMs in all samples were removed"}
+heatmap.2(cor(hsa_nc_exp_mean_filt), scale="none", dendrogram="column", trace="none", density="none", labRow=colnames(hsa_nc_exp_mean_filt), labCol=colnames(hsa_nc_exp_mean_filt), margins=c(6,6), col=hmcol)
+```
+
+```{r NC-spearman-tissue-hsa, fig.cap="Heatmap showing pair-wise Spearman correlation coefficient between tissues. pcRNAs with 0 FPKMs in all samples were removed"}
+heatmap.2(cor(hsa_nc_exp_mean_filt, method="spearman"), scale="none", dendrogram="column", trace="none", density="none", labRow=colnames(hsa_nc_exp_mean_filt), labCol=colnames(hsa_nc_exp_mean_filt), margins=c(6,6), col=hmcol)
+```
+
+```{r NC-pearson-pc-hsa, fig.cap="Heatmap showing pair-wise Pearson correlation coefficient between pcRNAs. The yellow-to-red bar at the top indicates the tissue specificty score of each pcRNAs, with yellow being 0 and red being 1. pcRNAs with no expression in any tissue were removed."}
+heatmap.2(cor(t(hsa_nc_exp_mean_filt)), scale="none", dendrogram="column", trace="none", density="none", labRow="", labCol="", margins=c(2,2), col=hmcol, ColSideColors=score_hsa, RowSideCol=as.character(max_tis_hsa))
+legend("bottomleft",legend=as.character(tissues_hsa), fill=as.character(levels(max_tis_hsa)), border=FALSE, bty="n", y.intersp = 0.9, cex=0.7, title="Tissues")
+```
+
+```{r NC-eu-pc-hsa, fig.cap="Heatmap showing pair-wise Euclidean distances between pcRNAs. pcRNAs with no expression in any tissue were removed."}
+eu_dist <- t(scale(t(hsa_nc_exp_mean_filt)))
+heatmap.2(as.matrix(dist(eu_dist)), scale="none", dendrogram="column", trace="none", density="none", labRow="", labCol="", margins=c(2,2), col=rev(hmcol), ColSideColors=score_hsa, RowSideCol=as.character(max_tis_hsa))
+legend("bottomleft",legend=as.character(tissues_hsa), fill=as.character(levels(max_tis_hsa)), border=FALSE, bty="n", y.intersp = 0.9, cex=0.7, title="Tissues")
+
+scoreColors <- c(unique(score_hsa[which(hsa_tissue_specificity[, "Score"] == max(hsa_tissue_specificity$Score))]), unique(score_hsa[which(hsa_tissue_specificity[, "Score"] == min(hsa_tissue_specificity$Score) )]))
+```
+
+The score mins (`r min(hsa_tissue_specificity$Score)`) and max (`r max(hsa_tissue_specificity$Score)`) are are: `r scoreColors`
+
+
+```{r NC-spearman-pc-hsa, fig.cap="Heatmap showing pair-wise Spearman correlation coefficient between pcRNAs. The yellow-to-red bar at the top indicates the tissue specificty score of each pcRNAs, with yellow being 0 and red being 1. pcRNAs with no expression in any tissue were removed."}
+heatmap.2(cor(t(hsa_nc_exp_mean_filt), method="spearman"), scale="none", dendrogram="column", trace="none", density="none", labRow="", labCol="", margins=c(2,2), col=hmcol, ColSideColors=score_hsa, RowSideCol=as.character(max_tis_hsa))
+legend("bottomleft",legend=as.character(tissues_hsa), fill=as.character(levels(max_tis_hsa)), border=FALSE, bty="n", y.intersp = 0.9, cex=0.7, title="Tissues")
+```
+
+
+### Tissue specificity and correlation of expression
+
+```{r tis-spec-pc-cod, fig.cap="Distribution of tissue specificity score for pcRNAs and corresponding coding genes"}
+ggplot(hsa_tissue_specificity_pc_and_coding_subclass, aes(Score, fill=as.factor(type))) + geom_density(alpha=0.3) + scale_fill_discrete(name="Type", labels=c("Coding", "pcRNA"))
+
+with(pc,wilcox.test(tisSpecPC, tisSpecCD))
+
+meanScorePc <- mean(pc$tisSpecPC, na.rm=T)
+medianScorePc <- median(pc$tisSpecPC, na.rm=T)
+meanScoreCd <- mean(pc$tisSpecCD, na.rm=T)
+medianScoreCd <- median(pc$tisSpecCD, na.rm=T)
+pvalwil <- with(pc,wilcox.test(tisSpecPC, tisSpecCD))$p.value
+```
+
+The mean tissue specificity score for pcRNAs is `r meanScorePc` (median `r medianScorePc`); for the coding genes its `r meanScoreCd` (median `r medianScoreCd`).
+
+The p-value is `r pvalwil` (null hypothesis that true location shift is equal to 0).
+
+```{r tis-spec-vs-exp, fig.cap="Tissue specificity score against maxFPKM for coding genes and pcRNAs"}
+ggplot(hsa_tissue_specificity_pc_and_coding_subclass, aes(x=maxFPKM, y=Score, colour=as.factor(type))) + geom_point(alpha=0.5) + scale_x_log10() + scale_colour_discrete(name="Type", labels=c("Coding", "pcRNA"))
+```
+
+```{r exp-subc, fig.cap="Distribution of maxFPKMs in each subclass. Subclass defined to minimize differences in maxFPKM."}
+ggplot(hsa_tissue_specificity_pc_and_coding_subclass, aes(y=log10(maxFPKM), x=as.factor(subclass), fill=type)) + geom_boxplot()
+```
+
+```{r exp-subc1, fig.cap="Tissue specificity score against maxFPKM for coding genes and pcRNAs divided by subclass"}
+ggplot(hsa_tissue_specificity_pc_and_coding_subclass, aes(x=maxFPKM, y=Score, colour=as.factor(type))) + geom_point(alpha=0.5) + scale_x_log10() + facet_wrap(~subclass, ncol=1) + scale_colour_discrete(name="Type", labels=c("Coding", "pcRNA"))
+```
+
+```{r exp-subc2, fig.cap="Distribution of tissue specificity score for pcRNAs and corresponding coding genes divided by subclass"}
+ggplot(hsa_tissue_specificity_pc_and_coding_subclass, aes(Score, colour=as.factor(type))) + geom_density() + scale_x_log10() + facet_wrap(~subclass) + scale_colour_discrete(name="Type", labels=c("Coding", "pcRNA"))
+```
+
+```{r TissueContingency, fig.cap="Contengency table showing how many pcRNAs exist for each combination of tissues"}
+maxTisContingency<-xtabs(~maxTisPC+maxTisCD, data=pc)
+maxTisContingency_norm <- melt(maxTisContingency/rowSums(maxTisContingency))
+ggplot(as.data.frame(maxTisContingency), aes(x=maxTisPC, y=maxTisCD, fill=Freq)) + geom_tile() + scale_fill_gradientn(colours=hmcol)
+```
+
+```{r TissueContingency2, fig.cap="Contengency table showing how many pcRNAs exist for each combination of tissues. Data normalized by column (each column adds up to 1)"}
+ggplot(maxTisContingency_norm, aes(x=maxTisPC, y=maxTisCD, fill=value)) + geom_tile() + scale_fill_gradientn(colours=hmcol)
+```
+
+```{r}
+hsa_tissue_specificity
+aa <- data.frame(Thr=rep(seq(min(hsa_tissue_specificity$Score),max(hsa_tissue_specificity$Score), 0.1), each=length(unique(hsa_tissue_specificity$maxTissue))), Tissue=NA, N=NA)
+for(i in seq(min(hsa_tissue_specificity$Score),max(hsa_tissue_specificity$Score), 0.1)){
+	aa[aa$Thr==i, "Tissue"] <- as.character(filter(hsa_tissue_specificity, Score<=i) %>% group_by(maxTissue) %>% summarize(count=n()) %>% .[[1]])
+	aa[aa$Thr==i, "N"] <- filter(hsa_tissue_specificity, Score<=i) %>% group_by(maxTissue) %>% summarize(count=n()) %>% .[[2]]
+	 ggplot(aa, aes(x=Thr, y=N, colour=Tissue)) + geom_line()
+}
+
+
+```
+```{r, fig.cap="Distribution of pcRNA tissue specificity diveded by Orientation"}
+ggplot(pc, aes(x=tisSpecPC, fill=Context)) + geom_density(alpha=0.4) + facet_wrap(~Context)
+```
+
+```{r tiss-spec, fig.cap="Bar chart showing for each tissue the number of pcRNAs with max expression in that tissue"}
+ggplot(hsa_tissue_specificity, aes(x=maxTissue, fill=maxTissue)) + geom_bar(colour="black")
+```
+
+```{r tiss-spec2, fig.cap="Tissue specificity score of each human pcRNA against its max FPKM across tissues"}
+ggplot(hsa_tissue_specificity, aes(y=Score, x=maxFPKM)) + geom_point() + scale_x_log10() + ggtitle("Tissue specificity score")
+```
+
+```{r tiss-spec-byTiss, fig.cap="Tissue specificity score of each human pcRNA against its max FPKM across tissues, by tissues"}
+ggplot(hsa_tissue_specificity[!is.na(hsa_tissue_specificity$maxTissue),], aes(y=Score, x=maxFPKM, colour=maxTissue)) + geom_point() + scale_x_log10(breaks = trans_breaks("log10", function(x) 10^x), labels = trans_format("log10", math_format(10^.x))) + facet_wrap("maxTissue") + ggtitle("Tissue specificity score")
+```
+
+```{r tiss-spec-byTiss-dens, fig.cap="Distribution of tissue specificity scores of each human pcRNA"}
+ggplot(hsa_tissue_specificity[!is.na(hsa_tissue_specificity$maxTissue),], aes(Score, fill=maxTissue)) + geom_density(alpha=0.5) + facet_wrap(~maxTissue)
+```
+
+```{r tiss-spec-pc-cd, fig.cap="Tissue specificity score of pcRNAs plotted against the tissue specificity score of their protein coding partners"}
+ggplot(pc, aes(x=tisSpecCD, y=tisSpecPC)) + geom_point()
+```
+
+```{r tiss-spec-pc-cd-col, fig.cap="Tissue specificity score of pcRNAs plotted against the tissue specificity score of their protein coding partners"}
+ggplot(pc, aes(x=tisSpecCD, y=tisSpecPC, colour=pc_cd_rho)) + geom_point()
+```
+
+```{r tiss-spec-pc-cd-bytis, fig.cap="Tissue specificity score of pcRNAs plotted against the tissue specificity score of their protein coding partners. The plots are diveded based on the tissue where the pcRNA had the highest expression"}
+ggplot(pc, aes(x= tisSpecCD, y=tisSpecPC)) + geom_point() + facet_wrap(~ maxTisPC)
+```
+
+```{r rho-by-tisSpec, fig.cap="Tissue specificity score of the pcRNA plotted against the Spearman correlation coefficient between pcRNA and coding partner. It's possible that this is a statistical artefact"}
+ggplot(pc, aes(x=tisSpecPC, y=pc_cd_rho)) + geom_point()
+```
+
+```{r rho-by-tisSpec-byCont, fig.cap="Tissue specificity score of the pcRNA plotted against the Spearman correlation coefficient between pcRNA and coding partner. It's possible that this is a statistical artefact"}
+ggplot(pc, aes(x=tisSpecPC, y=pc_cd_rho)) + geom_point() + facet_wrap(~Context)
+```
+
+```{r Dist-by-r, fig.cap="Spearman coefficient between the pcRNA and its coding partner across all samples plotted against the distance between the starts of the pcRNAs and its coding partner. The figure reports the R squared of the fit of Rho against log10 of the distance after excluding points with distance of 0."}
+options(scipen=-1)
+r2 <- dplyr::select(pc, Context, `Dist (st-st)`, pc_cd_rho) %>% dplyr::filter(`Dist (st-st)`!=0) %>% dplyr::group_by(Context) %>% do(lm=lm(data=., pc_cd_rho~log10(`Dist (st-st)`))) %>% dplyr::mutate(R2=summary(lm)$r.squared, c1=coef(lm)[1], c2=coef(lm)[2])
+ggplot(pc,aes(x=`Dist (st-st)`, y=pc_cd_rho,colour=Context))+geom_point() + facet_wrap(~Context) + geom_text(data=r2,x=log10(100), y=-0.9, size=3.5, aes(label=paste("R^2==",R2,sep="")),parse=T) + scale_x_log10() + geom_smooth(colour="black",method="lm", data=pc[pc$`Dist (st-st)`>0,], na.rm=T)
+gen_lm <- summary(lm(pc_cd_rho~log10(`Dist (st-st)`), data=pc[pc$"Dist (st-st)"!=0,]))
+gen_r2 <- gen_lm$r.squared
+gen_r2_p <- pf(gen_lm$fstatistic[1], gen_lm$fstatistic[2], gen_lm$fstatistic[3], lower.tail=F)
+```
+
+The R squared for all data (disregarding of the category) of the fit Rho vs log10 of the distance (after excluding cases with distance =0) is: `r gen_r2` (p-value `r gen_r2_p`).
+
+
+```{r R-distrib, fig.cap="Distribution of Spearman rho between pcRNAs and coding partners by positional category."}
+ggplot(pc, aes(pc_cd_rho))+geom_histogram(colour="white") + facet_wrap(~Context)
+```
+Mean rho: `r mean(pc$pc_cd_rho, na.rm=T)`; Median rho: `r median(pc$pc_cd_rho, na.rm=T)`; p-value `r pc_cd_rho_pval`
+
+```{r R-distrib2, fig.cap="Density distribution of Spearman rho between pcRNAs and coding partners  by positional category"}
+ggplot(pc, aes(pc_cd_rho, fill=Context))+geom_density(alpha=0.5) + facet_wrap(~Context)
+
+ggplot(pc, aes(pc_cd_rho)) + geom_density(alpha=0.2, fill="black") + geom_density(data=pc_cd_rho_df, aes(Background_rho),alpha=0.2, adjust=3)
+
+```
+
+
+### GO enrichment of tissue specific pcRNAs
+```{r GO-br, fig.width=14, fig.cap="Most enriched GO terms in coding genes associated with tissue specific pcRNAs (specificity score >mean). Terms with p-value >0.1 are omitted from this plot."}
+TIS="br"
+ggplot(allRes[[TIS]][allRes[[TIS]]$Fisherdef<0.1,], aes(y=Significant/Annotated,x=Term,colour=Fisherdef, size=Significant)) + geom_point(aes(order=plyr::desc(Fisherdef))) + scale_colour_gradient(name="p-value", low="red",high="yellow")   + coord_flip() + scale_size(range = c(3, 10)) + ggtitle(TIS)
+```
+
+```{r GO-cb, fig.width=14, fig.cap="Most enriched GO terms in coding genes associated with tissue specific pcRNAs (specificity score >mean). Terms with p-value >0.1 are omitted from this plot."}
+TIS="cb"
+ggplot(allRes[[TIS]][allRes[[TIS]]$Fisherdef<0.1,], aes(y=Significant/Annotated,x=Term,colour=Fisherdef, size=Significant)) + geom_point(aes(order=plyr::desc(Fisherdef))) + scale_colour_gradient(name="p-value", low="red",high="yellow")   + coord_flip() + scale_size(range = c(3, 10)) + ggtitle(TIS)
+```
+
+```{r GO-EScepA, fig.width=14, fig.cap="Most enriched GO terms in coding genes associated with tissue specific pcRNAs (specificity score >mean). Terms with p-value >0.1 are omitted from this plot."}
+TIS="EScepA"
+ggplot(allRes[[TIS]][allRes[[TIS]]$Fisherdef<0.1,], aes(y=Significant/Annotated,x=Term,colour=Fisherdef, size=Significant)) + geom_point(aes(order=plyr::desc(Fisherdef))) + scale_colour_gradient(name="p-value", low="red",high="yellow")   + coord_flip() + scale_size(range = c(3, 10)) + ggtitle(TIS)
+```
+
+
+```{r GO-EScypA, fig.width=14, fig.cap="Most enriched GO terms in coding genes associated with tissue specific pcRNAs (specificity score >mean). Terms with p-value >0.1 are omitted from this plot."}
+TIS="EScypA"
+ggplot(allRes[[TIS]][allRes[[TIS]]$Fisherdef<0.1,], aes(y=Significant/Annotated,x=Term,colour=Fisherdef, size=Significant)) + geom_point(aes(order=plyr::desc(Fisherdef))) + scale_colour_gradient(name="p-value", low="red",high="yellow")   + coord_flip() + scale_size(range = c(3, 10)) + ggtitle(TIS)
+```
+
+```{r GO-ESnupA, fig.width=14, fig.cap="Most enriched GO terms in coding genes associated with tissue specific pcRNAs (specificity score >mean). Terms with p-value >0.1 are omitted from this plot."}
+TIS="ESnupA"
+ggplot(allRes[[TIS]][allRes[[TIS]]$Fisherdef<0.1,], aes(y=Significant/Annotated,x=Term,colour=Fisherdef, size=Significant)) + geom_point(aes(order=plyr::desc(Fisherdef))) + scale_colour_gradient(name="p-value", low="red",high="yellow")   + coord_flip() + scale_size(range = c(3, 10)) + ggtitle(TIS)
+```
+
+```{r GO-GM12878, fig.width=14, fig.cap="Most enriched GO terms in coding genes associated with tissue specific pcRNAs (specificity score >mean). Terms with p-value >0.1 are omitted from this plot."}
+TIS="GM12878"
+ggplot(allRes[[TIS]][allRes[[TIS]]$Fisherdef<0.1,], aes(y=Significant/Annotated,x=Term,colour=Fisherdef, size=Significant)) + geom_point(aes(order=plyr::desc(Fisherdef))) + scale_colour_gradient(name="p-value", low="red",high="yellow")   + coord_flip() + scale_size(range = c(3, 10)) + ggtitle(TIS)
+```
+
+```{r GO-Hsmm, fig.width=14, fig.cap="Most enriched GO terms in coding genes associated with tissue specific pcRNAs (specificity score >mean). Terms with p-value >0.1 are omitted from this plot."}
+TIS="Hsmm"
+ggplot(allRes[[TIS]][allRes[[TIS]]$Fisherdef<0.1,], aes(y=Significant/Annotated,x=Term,colour=Fisherdef, size=Significant)) + geom_point(aes(order=plyr::desc(Fisherdef))) + scale_colour_gradient(name="p-value", low="red",high="yellow")   + coord_flip() + scale_size(range = c(3, 10)) + ggtitle(TIS)
+```
+
+```{r GO-ht, fig.width=14, fig.cap="Most enriched GO terms in coding genes associated with tissue specific pcRNAs (specificity score >mean). Terms with p-value >0.1 are omitted from this plot."}
+TIS="ht"
+ggplot(allRes[[TIS]][allRes[[TIS]]$Fisherdef<0.1,], aes(y=Significant/Annotated,x=Term,colour=Fisherdef, size=Significant)) + geom_point(aes(order=plyr::desc(Fisherdef))) + scale_colour_gradient(name="p-value", low="red",high="yellow")   + coord_flip() + scale_size(range = c(3, 10)) + ggtitle(TIS)
+```
+
+```{r GO-K562, fig.width=14, fig.cap="Most enriched GO terms in coding genes associated with tissue specific pcRNAs (specificity score >mean). Terms with p-value >0.1 are omitted from this plot."}
+TIS="K562"
+ggplot(allRes[[TIS]][allRes[[TIS]]$Fisherdef<0.1,], aes(y=Significant/Annotated,x=Term,colour=Fisherdef, size=Significant)) + geom_point(aes(order=plyr::desc(Fisherdef))) + scale_colour_gradient(name="p-value", low="red",high="yellow")   + coord_flip() + scale_size(range = c(3, 10)) + ggtitle(TIS)
+```
+
+```{r GO-kd, fig.width=14, fig.cap="Most enriched GO terms in coding genes associated with tissue specific pcRNAs (specificity score >mean). Terms with p-value >0.1 are omitted from this plot."}
+TIS="kd"
+ggplot(allRes[[TIS]][allRes[[TIS]]$Fisherdef<0.1,], aes(y=Significant/Annotated,x=Term,colour=Fisherdef, size=Significant)) + geom_point(aes(order=plyr::desc(Fisherdef))) + scale_colour_gradient(name="p-value", low="red",high="yellow")   + coord_flip() + scale_size(range = c(3, 10)) + ggtitle(TIS)
+```
+
+```{r GO-lv, fig.width=14, fig.cap="Most enriched GO terms in coding genes associated with tissue specific pcRNAs (specificity score >mean). Terms with p-value >0.1 are omitted from this plot."}
+TIS="lv"
+ggplot(allRes[[TIS]][allRes[[TIS]]$Fisherdef<0.1,], aes(y=Significant/Annotated,x=Term,colour=Fisherdef, size=Significant)) + geom_point(aes(order=plyr::desc(Fisherdef))) + scale_colour_gradient(name="p-value", low="red",high="yellow")   + coord_flip() + scale_size(range = c(3, 10)) + ggtitle(TIS)
+```
+
+```{r GO-ts, fig.width=14, fig.cap="Most enriched GO terms in coding genes associated with tissue specific pcRNAs (specificity score >mean). Terms with p-value >0.1 are omitted from this plot."}
+TIS="ts"
+ggplot(allRes[[TIS]][allRes[[TIS]]$Fisherdef<0.1,], aes(y=Significant/Annotated,x=Term,colour=Fisherdef, size=Significant)) + geom_point(aes(order=plyr::desc(Fisherdef))) + scale_colour_gradient(name="p-value", low="red",high="yellow")   + coord_flip() + scale_size(range = c(3, 10)) + ggtitle(TIS)
+```
+
+
+
+
+
+

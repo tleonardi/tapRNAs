@@ -1,0 +1,101 @@
+##Expression analysis of human pcRNAs
+
+```{r set-options, echo=FALSE, cache=FALSE}
+        options(replace.assign=TRUE,width=70)
+        opts_chunk$set(dev=c("png","pdf"), dpi=300, fig.path='humanExp-fig/', cache.path='cache/humanExp-', par=TRUE, echo=FALSE, warning=F, message=F, cache=FALSE, results='hide', error=F)
+```
+
+```{r load-libs, cache=F}
+library("ggplot2")
+library("dplyr")
+library("reshape")
+library("gplots")
+library("RColorBrewer")
+library("scales")
+library("MatchIt")
+library(reshape2)
+library(boot)
+hmcol = colorRampPalette(brewer.pal(9, "GnBu"))(100)
+BASEDIR="/nfs/research2/enright/tom/projects/new-pcRNAs/analysis"
+
+load("report/data/pc.Rdata")
+load("report/data/hsa_nc_exp.Rdata")
+source("functions.R")
+
+```
+
+
+```{r Our data}
+colnames(hsa_nc_exp) <- gsub("_FPKM", "", colnames(hsa_nc_exp))
+hsa_nc_exp <- select(hsa_nc_exp, EScepA, EScypA, ESnupA)
+
+hsa_tracking <- read.delim(paste(BASEDIR,"/transcriptomes/cuffnorm/hsa/isoforms.fpkm_tracking", sep="/"), stringsAsFactors=F, header=T)
+gencode_lnc <- read.delim(paste(BASEDIR,"/downstream/hic/Gencode.v21.linc.spliced.bed", sep="/"), stringsAsFactors=F, header=F)
+hsa_tracking <- mutate(hsa_tracking, nearest_ref_id=gsub("\\.[0-9]+$", "", nearest_ref_id))
+gencode_exp <- hsa_tracking[hsa_tracking$nearest_ref_id %in% gencode_lnc$V4, grepl("tracking_id|FPKM", colnames(hsa_tracking))]
+colnames(gencode_exp) <- gsub("_FPKM", "", colnames(gencode_exp))
+gencode_exp <- select(gencode_exp, EScepA, EScypA, ESnupA)
+# This is necessary, because this type of filtering has already been
+# applied upstream to hsa_nc_exp
+gencode_exp[gencode_exp$EScepA<0.001, "EScepA"] <- 0
+gencode_exp[gencode_exp$EScypA<0.001, "EScypA"] <- 0
+gencode_exp[gencode_exp$ESnupA<0.001, "ESnupA"] <- 0
+
+pc_loc <- mutate(hsa_nc_exp, lc=ESnupA/EScypA, Type=1) %>% select(lc, Type, EScepA, ESnupA, EScypA)
+gen_loc <- mutate(gencode_exp, lc=ESnupA/EScypA, Type=0) %>% select(lc, Type,EScepA,  ESnupA, EScypA)
+
+loc <- rbind(pc_loc, gen_loc) %>% filter(!is.na(lc))
+loc <- mutate(loc, mean=(ESnupA+EScypA)/2) %>% filter(mean>0.1)
+
+loc_class <- matchit(Type~mean, data=loc, method="subclass", subclass=6, sub.by="control")
+
+loc_subclass <- match.data(loc_class)
+
+pdf("subcellular_loc.pdf")
+print(ggplot(loc_subclass, aes(y=log10(lc), x=log10(mean), colour=as.factor(Type))) + geom_point(alpha=0.3) + facet_grid(subclass~as.factor(Type)) + theme_bw())
+print(ggplot(loc_subclass, aes(x=log10(lc), colour=as.factor(Type))) + geom_density(alpha=0.3) + facet_wrap(~subclass, ncol=1) + theme_bw() + coord_flip() + theme_bw())
+
+
+# lncRNA Atlas
+
+lnc_atlas <- read.csv("/nfs/leia/research/enright/tom/projects/new-pcRNAs/data/2017-10-03_lncATLAS_all_data.csv", stringsAsFactors=F)
+
+lnc_atlas <- filter(lnc_atlas, Data.Type %in% c("cytosol", "nucleus", "cell"))
+# This was produced with bedparse from the gencode GTF.
+# transcript_id, gene_id, gene_type
+gencode_types <- read.delim("/nfs/leia/research/enright/tom/projects/new-pcRNAs/data/gencode.v24.annotation.info.txt", stringsAsFactors=F, header=F) %>%
+		mutate(V1=gsub("(.+)\\.[0-9]+$", "\\1", V1), V2=gsub("(.+)\\.[0-9]+$", "\\1", V2))
+pc_filtered_genes <- filter(gencode_types, V1 %in% pc$Name) %>% select(V2,V3) %>% unique %>% filter(V3!="protein_coding")
+
+gencode_linc <- filter(gencode_types, V3=="lincRNA" &  ! V2 %in% pc_filtered_genes$V2) %>% select(V2,V3) %>% unique
+
+lnc_atlas[lnc_atlas$ENSEMBL.ID %in% pc_filtered_genes$V2, "Biotype"] <- "pcRNA"
+lnc_atlas[lnc_atlas$ENSEMBL.ID %in% gencode_linc$V2, "Biotype"] <- "lincRNA"
+
+lnc_atlas <- select(lnc_atlas, -Coding.Type) %>% dcast(ENSEMBL.ID+Data.Source+Gene.Name+Biotype~Data.Type, value.var="Value")
+
+lnc_atlas[is.na(lnc_atlas$cytosol), "cytosol"] <- 0
+lnc_atlas[is.na(lnc_atlas$nucleus), "nucleus"] <- 0
+lnc_atlas <- filter(lnc_atlas, !is.na(cell), (cytosol+nucleus)!=0)
+
+
+lnc_atlas <- mutate(lnc_atlas, tot=cytosol+nucleus, logit=inv.logit(log2(cytosol/nucleus))) %>% group_by(ENSEMBL.ID) %>% slice(which.max(cell))
+
+#lnc_atlas %>% ggplot(aes(x=Biotype, y=inv.logit(log2(cytosol/nucleus)))) + geom_boxplot() + theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust=0.5)) 
+lnc_atlas %>% ggplot(aes(colour=Biotype, x=logit)) + geom_density() + theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust=0.5)) + theme_bw() 
+
+lnc_atlas <- filter(lnc_atlas, Biotype %in% c("lincRNA", "pcRNA"))
+lnc_atlas[lnc_atlas$Biotype=="lincRNA", "Biotype"] <- 0
+lnc_atlas[lnc_atlas$Biotype=="pcRNA", "Biotype"] <- 1
+lnc_atlas$Biotype <- as.numeric(lnc_atlas$Biotype)
+loc_class <- matchit(Biotype~cell, data=as.data.frame(lnc_atlas), method="nearest", subclass=3, sub.by="treat")
+
+loc_subclass <- match.data(loc_class)
+ggplot(loc_subclass, aes(x=logit, colour=as.factor(Biotype))) + geom_density() + facet_wrap(~subclass, ncol=1) + theme_bw() 
+ggplot(loc_subclass, aes(x="0", fill=as.factor(Biotype), y=log10(cell))) + geom_boxplot() + facet_wrap(~subclass, ncol=1) + theme_bw()
+ggplot(loc_subclass, aes(x=log10(cytosol), y=log10(nucleus), colour=as.factor(Biotype))) + geom_point() + facet_wrap(~subclass, ncol=1) + geom_abline(slope=1, intercept=0) + theme_bw()
+
+
+dev.off()
+
+```

@@ -1,0 +1,3 @@
+% Analysis of pcRNAs
+% Git commit `r system("cd /nfs/research2/enright/tom/projects/new-pcRNAs && git log -1 --format='%H'", intern=T)`
+% `r system('date +"%d-%m-%y"', intern=T)`

@@ -1,0 +1,280 @@
+## GO enrichment analysis
+```{r set-options, echo=FALSE, cache=FALSE}
+        options(replace.assign=TRUE,width=70)
+        opts_chunk$set(dev=c("png","pdf"), dpi=300, fig.path='GO-fig/', cache.path='cache/GO-', par=TRUE, echo=FALSE, warning=F, message=F, cache=FALSE, results='hide', error=F)
+```
+
+```{r load-libs, cache=F}
+library("topGO")
+library("plyr")
+library("org.Hs.eg.db")
+library("ggplot2")
+library("reshape")
+
+load("report/data/pc.Rdata")
+source("functions.R")
+
+```
+
+```{r Run analysis}
+BASEDIR="/nfs/research2/enright/tom/projects/new-pcRNAs/analysis"
+
+# Get list of all genes with synteny in mouse
+bgAnnot<- read.delim(paste(BASEDIR,"data/hg38ToMm10_orthologs_mart.txt", sep="/"), stringsAsFactors=F, header=F)
+
+bgGenes <- unique(bgAnnot[grepl("ENSMUSG", bgAnnot$V3),"V1"])
+
+# Get the list of genes associated with pcRNAs
+selectedGenes <-  unique(pc$"Closest Gene Gencode")
+
+# Make a copy of all genes that we will use as a background for doing enrichment on the single categories
+all_selectedGenes <- selectedGenes
+
+# Make the geneList for topGO
+geneList <- factor(as.integer( bgGenes %in% selectedGenes))
+names(geneList) <- bgGenes
+
+# Create topGO object
+data <- new("topGOdata", ontology = "BP", allGenes = geneList, annot = annFUN.org, ID = "ensembl", mapping="org.Hs.eg.db", nodeSize = 10)
+
+# Run test and correct p-vals
+resultFis.def <- runTest(data, statistic = "fisher")
+
+score(resultFis.def) <- p.adjust(score(resultFis.def), method="BH")
+
+
+allRes <- GenTable(data, Fisherdef = resultFis.def,  orderBy="Fisherdef", topNodes=20)
+allRes$Fisherdef <- as.numeric(allRes$Fisherdef)
+allRes$Term <- paste(allRes$Term,allRes$GO.ID)
+allRes$Term <- factor(allRes$Term, levels=allRes$Term[order(allRes$Significant/allRes$Annotated,decreasing=F)])
+
+allGO = genesInTerm(data)
+my_annotation= lapply(allGO,function(x) x[x %in% all_selectedGenes] )
+sig_tab <- allRes
+sig_tab$genes <- apply(allRes,1,function(x) paste(unique(unlist(pc[pc[,"Closest Gene Gencode"] %in% my_annotation[[x[1]]], "Close GeneSym"])), collapse=", "))
+write.table(sig_tab, "report/data/GO/GOEnrichment_allCat.txt", quote=F, sep="\t")
+```
+
+```{r GO-table, results="asis", fig.cap="Most enriched GO terms in protein coding genes associated with pcRNAs"}
+kable(allRes, format = "markdown")
+```
+
+```{r GO-plot-terms, fig.width=14, fig.cap="Most enriched GO terms in protein coding genes associated with pcRNAs. p-values were corrected for multiple hypothesis testing using the Benjamini-Hochberg method. Terms with p-value >0.1 are omitted from this plot."}
+ggplot(allRes[allRes$Fisherdef<0.1,], aes(y=Significant/Annotated,x=Term,colour=Fisherdef, size=Significant)) + geom_point(aes(order=desc(Fisherdef))) + scale_colour_gradient(name="p-value", low="red",high="yellow")   + coord_flip() + scale_size(range = c(3, 10))
+```
+
+
+### GO enrichment for "Asense" pcRNAs
+```{r asense-go, fig.width=14, fig.cap="Most enriched GO terms in protein coding genes associated with Asense pcRNAs. p-values were NOT corrected for multiple hypothesis testing."}
+# all_selectedGenes Contains the gene IDs of all protein coding genes associated with pcRNAs
+# Asense
+Category="Asense"
+selectedGenes <- unique(pc[pc$Context==Category, "Closest Gene Gencode"])
+
+# Make the geneList for topGO
+geneList <- factor(as.integer( all_selectedGenes %in% selectedGenes))
+names(geneList) <- all_selectedGenes
+
+# Create topGO object
+data <- new("topGOdata", ontology = "BP", allGenes = geneList, annot = annFUN.org, ID = "ensembl", mapping="org.Hs.eg.db")
+
+# Run test and correct
+resultFis.def <- runTest(data, statistic = "fisher")
+
+# Organise results
+allRes <- GenTable(data, Fisherdef = resultFis.def,  orderBy="Fisherdef", topNodes=10)
+allRes$Fisherdef <- as.numeric(allRes$Fisherdef)
+allRes$Term <- paste(allRes$Term,allRes$GO.ID)
+allRes$Term <- factor(allRes$Term, levels=allRes$Term[order(allRes$Significant/allRes$Annotated,decreasing=F)])
+ggplot(allRes[allRes$Fisherdef<0.1,], aes(y=Significant/Annotated,x=Term,colour=Fisherdef, size=Significant)) + geom_point(aes(order=desc(Fisherdef))) + scale_colour_gradient(name="p-value", low="red",high="yellow")   + coord_flip() + scale_size(range = c(3, 10))
+allGO = genesInTerm(data)
+my_annotation= lapply(allGO,function(x) x[x %in% all_selectedGenes] )
+sig_tab <- allRes
+sig_tab$genes <- apply(allRes,1,function(x) paste(unique(unlist(pc[pc[,"Closest Gene Gencode"] %in% my_annotation[[x[1]]], "Close GeneSym"])), collapse=", "))
+write.table(sig_tab, "report/data/GO/GOEnrichment_Asense.txt", quote=F, sep="\t")
+```
+
+
+### GO enrichment for "BIDIR" pcRNAs
+```{r bidir-go, fig.width=14, fig.cap="Most enriched GO terms in protein coding genes associated with BIDIR pcRNAs. p-values were NOT corrected for multiple hypothesis testing."}
+# all_selectedGenes Contains the gene IDs of all protein coding genes associated with pcRNAs
+# Asense
+Category="BIDIR"
+selectedGenes <- unique(pc[pc$Context==Category, "Closest Gene Gencode"])
+
+# Make the geneList for topGO
+geneList <- factor(as.integer( all_selectedGenes %in% selectedGenes))
+names(geneList) <- all_selectedGenes
+
+# Create topGO object
+data <- new("topGOdata", ontology = "BP", allGenes = geneList, annot = annFUN.org, ID = "ensembl", mapping="org.Hs.eg.db")
+
+# Run test and correct
+resultFis.def <- runTest(data, statistic = "fisher")
+
+# Organise results
+allRes <- GenTable(data, Fisherdef = resultFis.def,  orderBy="Fisherdef", topNodes=10)
+allRes$Fisherdef <- as.numeric(allRes$Fisherdef)
+allRes$Term <- paste(allRes$Term,allRes$GO.ID)
+allRes$Term <- factor(allRes$Term, levels=allRes$Term[order(allRes$Significant/allRes$Annotated,decreasing=F)])
+ggplot(allRes[allRes$Fisherdef<0.1,], aes(y=Significant/Annotated,x=Term,colour=Fisherdef, size=Significant)) + geom_point(aes(order=desc(Fisherdef))) + scale_colour_gradient(name="p-value", low="red",high="yellow")   + coord_flip() + scale_size(range = c(3, 10))
+allGO = genesInTerm(data)
+my_annotation= lapply(allGO,function(x) x[x %in% all_selectedGenes] )
+sig_tab <- allRes
+sig_tab$genes <- apply(allRes,1,function(x) paste(unique(unlist(pc[pc[,"Closest Gene Gencode"] %in% my_annotation[[x[1]]], "Close GeneSym"])), collapse=", "))
+write.table(sig_tab, "report/data/GO/GOEnrichment_BIDIR.txt", quote=F, sep="\t")
+```
+
+
+### GO enrichment for "US-S" pcRNAs
+```{r us-s-go, fig.width=14, fig.cap="Most enriched GO terms in protein coding genes associated with US-S pcRNAs. p-values were NOT corrected for multiple hypothesis testing."}
+# all_selectedGenes Contains the gene IDs of all protein coding genes associated with pcRNAs
+# Asense
+Category="US-S"
+selectedGenes <- unique(pc[pc$Context==Category, "Closest Gene Gencode"])
+
+# Make the geneList for topGO
+geneList <- factor(as.integer( all_selectedGenes %in% selectedGenes))
+names(geneList) <- all_selectedGenes
+
+# Create topGO object
+data <- new("topGOdata", ontology = "BP", allGenes = geneList, annot = annFUN.org, ID = "ensembl", mapping="org.Hs.eg.db")
+
+# Run test and correct
+resultFis.def <- runTest(data, statistic = "fisher")
+
+# Organise results
+allRes <- GenTable(data, Fisherdef = resultFis.def,  orderBy="Fisherdef", topNodes=10)
+allRes$Fisherdef <- as.numeric(allRes$Fisherdef)
+allRes$Term <- paste(allRes$Term,allRes$GO.ID)
+allRes$Term <- factor(allRes$Term, levels=allRes$Term[order(allRes$Significant/allRes$Annotated,decreasing=F)])
+ggplot(allRes[allRes$Fisherdef<0.1,], aes(y=Significant/Annotated,x=Term,colour=Fisherdef, size=Significant)) + geom_point(aes(order=desc(Fisherdef))) + scale_colour_gradient(name="p-value", low="red",high="yellow")   + coord_flip() + scale_size(range = c(3, 10))
+allGO = genesInTerm(data)
+my_annotation= lapply(allGO,function(x) x[x %in% all_selectedGenes] )
+sig_tab <- allRes
+sig_tab$genes <- apply(allRes,1,function(x) paste(unique(unlist(pc[pc[,"Closest Gene Gencode"] %in% my_annotation[[x[1]]], "Close GeneSym"])), collapse=", "))
+write.table(sig_tab, "report/data/GO/GOEnrichment_US-S.txt", quote=F, sep="\t")
+```
+
+
+### GO enrichment for "US-AS" pcRNAs
+```{r us-as-go, fig.width=14, fig.cap="Most enriched GO terms in protein coding genes associated with US-AS pcRNAs. p-values were NOT corrected for multiple hypothesis testing."}
+# all_selectedGenes Contains the gene IDs of all protein coding genes associated with pcRNAs
+# Asense
+Category="US-AS"
+selectedGenes <- unique(pc[pc$Context==Category, "Closest Gene Gencode"])
+
+# Make the geneList for topGO
+geneList <- factor(as.integer( all_selectedGenes %in% selectedGenes))
+names(geneList) <- all_selectedGenes
+
+# Create topGO object
+data <- new("topGOdata", ontology = "BP", allGenes = geneList, annot = annFUN.org, ID = "ensembl", mapping="org.Hs.eg.db")
+
+# Run test and correct
+resultFis.def <- runTest(data, statistic = "fisher")
+
+# Organise results
+allRes <- GenTable(data, Fisherdef = resultFis.def,  orderBy="Fisherdef", topNodes=10)
+allRes$Fisherdef <- as.numeric(allRes$Fisherdef)
+allRes$Term <- paste(allRes$Term,allRes$GO.ID)
+allRes$Term <- factor(allRes$Term, levels=allRes$Term[order(allRes$Significant/allRes$Annotated,decreasing=F)])
+ggplot(allRes[allRes$Fisherdef<0.1,], aes(y=Significant/Annotated,x=Term,colour=Fisherdef, size=Significant)) + geom_point(aes(order=desc(Fisherdef))) + scale_colour_gradient(name="p-value", low="red",high="yellow")   + coord_flip() + scale_size(range = c(3, 10))
+allGO = genesInTerm(data)
+my_annotation= lapply(allGO,function(x) x[x %in% all_selectedGenes] )
+sig_tab <- allRes
+sig_tab$genes <- apply(allRes,1,function(x) paste(unique(unlist(pc[pc[,"Closest Gene Gencode"] %in% my_annotation[[x[1]]], "Close GeneSym"])), collapse=", "))
+write.table(sig_tab, "report/data/GO/GOEnrichment_US-AS.txt", quote=F, sep="\t")
+```
+
+
+### GO enrichment for "DS-S" pcRNAs
+```{r ds-s-go, fig.width=14, fig.cap="Most enriched GO terms in protein coding genes associated with DS-S pcRNAs. p-values were NOT corrected for multiple hypothesis testing."}
+# all_selectedGenes Contains the gene IDs of all protein coding genes associated with pcRNAs
+# Asense
+Category="DS-S"
+selectedGenes <- unique(pc[pc$Context==Category, "Closest Gene Gencode"])
+
+# Make the geneList for topGO
+geneList <- factor(as.integer( all_selectedGenes %in% selectedGenes))
+names(geneList) <- all_selectedGenes
+
+# Create topGO object
+data <- new("topGOdata", ontology = "BP", allGenes = geneList, annot = annFUN.org, ID = "ensembl", mapping="org.Hs.eg.db")
+
+# Run test and correct
+resultFis.def <- runTest(data, statistic = "fisher")
+
+# Organise results
+allRes <- GenTable(data, Fisherdef = resultFis.def,  orderBy="Fisherdef", topNodes=10)
+allRes$Fisherdef <- as.numeric(allRes$Fisherdef)
+allRes$Term <- paste(allRes$Term,allRes$GO.ID)
+allRes$Term <- factor(allRes$Term, levels=allRes$Term[order(allRes$Significant/allRes$Annotated,decreasing=F)])
+ggplot(allRes[allRes$Fisherdef<0.1,], aes(y=Significant/Annotated,x=Term,colour=Fisherdef, size=Significant)) + geom_point(aes(order=desc(Fisherdef))) + scale_colour_gradient(name="p-value", low="red",high="yellow")   + coord_flip() + scale_size(range = c(3, 10))
+allGO = genesInTerm(data)
+my_annotation= lapply(allGO,function(x) x[x %in% all_selectedGenes] )
+sig_tab <- allRes
+sig_tab$genes <- apply(allRes,1,function(x) paste(unique(unlist(pc[pc[,"Closest Gene Gencode"] %in% my_annotation[[x[1]]], "Close GeneSym"])), collapse=", "))
+write.table(sig_tab, "report/data/GO/GOEnrichment_DS-S.txt", quote=F, sep="\t")
+```
+
+
+### GO enrichment for "DS-AS" pcRNAs
+```{r ds-as-go, fig.width=14, fig.cap="Most enriched GO terms in protein coding genes associated with DS-AS pcRNAs. p-values were NOT corrected for multiple hypothesis testing."}
+# all_selectedGenes Contains the gene IDs of all protein coding genes associated with pcRNAs
+# Asense
+Category="DS-AS"
+selectedGenes <- unique(pc[pc$Context==Category, "Closest Gene Gencode"])
+
+# Make the geneList for topGO
+geneList <- factor(as.integer( all_selectedGenes %in% selectedGenes))
+names(geneList) <- all_selectedGenes
+
+# Create topGO object
+data <- new("topGOdata", ontology = "BP", allGenes = geneList, annot = annFUN.org, ID = "ensembl", mapping="org.Hs.eg.db")
+
+# Run test and correct
+resultFis.def <- runTest(data, statistic = "fisher")
+
+# Organise results
+allRes <- GenTable(data, Fisherdef = resultFis.def,  orderBy="Fisherdef", topNodes=10)
+allRes$Fisherdef <- as.numeric(allRes$Fisherdef)
+allRes$Term <- paste(allRes$Term,allRes$GO.ID)
+allRes$Term <- factor(allRes$Term, levels=allRes$Term[order(allRes$Significant/allRes$Annotated,decreasing=F)])
+ggplot(allRes[allRes$Fisherdef<0.1,], aes(y=Significant/Annotated,x=Term,colour=Fisherdef, size=Significant)) + geom_point(aes(order=desc(Fisherdef))) + scale_colour_gradient(name="p-value", low="red",high="yellow")   + coord_flip() + scale_size(range = c(3, 10))
+allGO = genesInTerm(data)
+my_annotation= lapply(allGO,function(x) x[x %in% all_selectedGenes] )
+sig_tab <- allRes
+sig_tab$genes <- apply(allRes,1,function(x) paste(unique(unlist(pc[pc[,"Closest Gene Gencode"] %in% my_annotation[[x[1]]], "Close GeneSym"])), collapse=", "))
+write.table(sig_tab, "report/data/GO/GOEnrichment_DS-AS.txt", quote=F, sep="\t")
+```
+
+### GO enrichment for "OLAP" pcRNAs
+```{r olap-go, fig.width=14, fig.cap="Most enriched GO terms in protein coding genes associated with OLAP pcRNAs. p-values were NOT corrected for multiple hypothesis testing."}
+# all_selectedGenes Contains the gene IDs of all protein coding genes associated with pcRNAs
+# Asense
+Category="OLAP"
+selectedGenes <- unique(pc[pc$Context==Category, "Closest Gene Gencode"])
+
+# Make the geneList for topGO
+geneList <- factor(as.integer( all_selectedGenes %in% selectedGenes))
+names(geneList) <- all_selectedGenes
+
+# Create topGO object
+data <- new("topGOdata", ontology = "BP", allGenes = geneList, annot = annFUN.org, ID = "ensembl", mapping="org.Hs.eg.db")
+
+# Run test and correct
+resultFis.def <- runTest(data, statistic = "fisher")
+
+# Organise results
+allRes <- GenTable(data, Fisherdef = resultFis.def,  orderBy="Fisherdef", topNodes=10)
+allRes$Fisherdef <- as.numeric(allRes$Fisherdef)
+allRes$Term <- paste(allRes$Term,allRes$GO.ID)
+allRes$Term <- factor(allRes$Term, levels=allRes$Term[order(allRes$Significant/allRes$Annotated,decreasing=F)])
+ggplot(allRes[allRes$Fisherdef<0.1,], aes(y=Significant/Annotated,x=Term,colour=Fisherdef, size=Significant)) + geom_point(aes(order=desc(Fisherdef))) + scale_colour_gradient(name="p-value", low="red",high="yellow")   + coord_flip() + scale_size(range = c(3, 10))
+allGO = genesInTerm(data)
+my_annotation= lapply(allGO,function(x) x[x %in% all_selectedGenes] )
+sig_tab <- allRes
+sig_tab$genes <- apply(allRes,1,function(x) paste(unique(unlist(pc[pc[,"Closest Gene Gencode"] %in% my_annotation[[x[1]]], "Close GeneSym"])), collapse=", "))
+write.table(sig_tab, "report/data/GO/GOEnrichment_OLAP.txt", quote=F, sep="\t")
+```

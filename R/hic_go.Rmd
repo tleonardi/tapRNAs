@@ -1,0 +1,168 @@
+##HiC GO Enrichment analysis
+
+```{r set-options, echo=FALSE, cache=FALSE}
+        options(replace.assign=TRUE,width=70)
+        opts_chunk$set(dev=c("png","pdf"), dpi=300, fig.path='hicGO-fig/', cache.path='cache/hicGO-', par=TRUE, echo=FALSE, warning=F, message=F, cache=FALSE, results='hide', error=F)
+```
+
+```{r load-libs, cache=F}
+library("topGO")
+library(dplyr)
+library("plyr")
+library("org.Hs.eg.db")
+library("ggplot2")
+library("reshape")
+
+load("report/data/pc.Rdata")
+source("functions.R")
+
+```
+
+```{r}
+# GO of pcRNAs with loop using all genes as BG
+BASEDIR="/nfs/research2/enright/tom/projects/new-pcRNAs/analysis"
+pcWithLoops <- read.delim(paste0(BASEDIR,"/downstream/hic/loopOverlapAllLinesPromoter/pc_with_loops_in_prom.txt"), header=F, stringsAsFactors=F)
+colnames(pcWithLoops) <- c("Name", "N")
+pcWithLoops <- unique(unlist(strsplit(pcWithLoops$Name, ",")))
+
+codingOfPcWithLoops <- dplyr::filter(pc, Name %in% pcWithLoops) %>% dplyr::select(`Closest Gene Gencode`) %>% .[[1]] %>% unique()
+
+
+bgAnnot<- read.delim(paste(BASEDIR,"data/hg38ToMm10_orthologs_mart.txt", sep="/"), stringsAsFactors=F, header=F)
+
+bgGenes <- unique(bgAnnot[grepl("ENSMUSG", bgAnnot$V3),"V1"])
+
+# Get the list of genes
+selectedGenes <- codingOfPcWithLoops
+
+# Make a copy of all genes that we will use as a background for doing enrichment on the single categories
+all_selectedGenes <- selectedGenes
+
+# Make the geneList for topGO
+geneList <- factor(as.integer( bgGenes %in% selectedGenes))
+names(geneList) <- bgGenes
+
+# Create topGO object
+data <- new("topGOdata", ontology = "BP", allGenes = geneList, annot = annFUN.org, ID = "ensembl", mapping="org.Hs.eg.db", nodeSize = 10)
+
+# Run test and correct p-vals
+resultFis.def <- runTest(data, statistic = "fisher")
+
+score(resultFis.def) <- p.adjust(score(resultFis.def), method="BH")
+
+
+allRes <- GenTable(data, Fisherdef = resultFis.def,  orderBy="Fisherdef", topNodes=20)
+allRes$Fisherdef <- as.numeric(allRes$Fisherdef)
+allRes$Term <- paste(allRes$Term,allRes$GO.ID)
+allRes$Term <- factor(allRes$Term, levels=allRes$Term[order(allRes$Significant/allRes$Annotated,decreasing=F)])
+
+allGO = genesInTerm(data)
+my_annotation= lapply(allGO,function(x) x[x %in% all_selectedGenes] )
+sig_tab <- allRes
+sig_tab$genes <- apply(allRes,1,function(x) paste(unique(unlist(pc[pc[,"Closest Gene Gencode"] %in% my_annotation[[x[1]]], "Close GeneSym"])), collapse=", "))
+write.table(sig_tab, "report/data/GO/GOEnrichment_pcWithHiCLoop.txt", quote=F, sep="\t")
+```
+
+
+```{r GO-table, results="asis", fig.cap="Most enriched GO terms in protein coding genes associated with pcRNAs whose promoter overlaps a loop. (BG all genes with mouse orthologue)"}
+kable(allRes, format = "markdown")
+```
+
+```{r GO-plot-terms, fig.width=14, fig.cap="Most enriched GO terms in protein coding genes associated with pcRNAs whose promoter overlaps a loop. BG all genes with mouse orthologue. p-values were corrected for multiple hypothesis testing using the Benjamini-Hochberg method. Terms with p-value >0.1 are omitted from this plot."}
+ggplot(allRes[allRes$Fisherdef<0.1,], aes(y=Significant/Annotated,x=Term,colour=Fisherdef, size=Significant)) + geom_point(aes(order=desc(Fisherdef))) + scale_colour_gradient(name="p-value", low="red",high="yellow")   + coord_flip() + scale_size(range = c(3, 10))
+```
+
+```{r}
+# GO of pcRNAs without loop using all genes as BG
+pcWithLoops <- read.delim(paste0(BASEDIR,"/downstream/hic/loopOverlapAllLinesPromoter/pc_with_loops_in_prom.txt"), header=F, stringsAsFactors=F)
+colnames(pcWithLoops) <- c("Name", "N")
+pcWithNoLoops <- pc[! pc$Name %in% unique(unlist(strsplit(pcWithLoops$Name, ","))), "Name"]
+
+codingOfPcWithNoLoops <- dplyr::filter(pc, Name %in% pcWithNoLoops) %>% dplyr::select(`Closest Gene Gencode`) %>% .[[1]] %>% unique()
+
+
+bgAnnot<- read.delim(paste(BASEDIR,"data/hg38ToMm10_orthologs_mart.txt", sep="/"), stringsAsFactors=F, header=F)
+
+bgGenes <- unique(bgAnnot[grepl("ENSMUSG", bgAnnot$V3),"V1"])
+
+# Get the list of genes
+selectedGenes <- codingOfPcWithNoLoops
+
+# Make a copy of all genes that we will use as a background for doing enrichment on the single categories
+all_selectedGenes <- selectedGenes
+
+# Make the geneList for topGO
+geneList <- factor(as.integer( bgGenes %in% selectedGenes))
+names(geneList) <- bgGenes
+
+# Create topGO object
+data <- new("topGOdata", ontology = "BP", allGenes = geneList, annot = annFUN.org, ID = "ensembl", mapping="org.Hs.eg.db", nodeSize = 10)
+
+# Run test and correct p-vals
+resultFis.def <- runTest(data, statistic = "fisher")
+
+score(resultFis.def) <- p.adjust(score(resultFis.def), method="BH")
+
+
+allRes <- GenTable(data, Fisherdef = resultFis.def,  orderBy="Fisherdef", topNodes=20)
+allRes$Fisherdef <- as.numeric(allRes$Fisherdef)
+allRes$Term <- paste(allRes$Term,allRes$GO.ID)
+allRes$Term <- factor(allRes$Term, levels=allRes$Term[order(allRes$Significant/allRes$Annotated,decreasing=F)])
+
+allGO = genesInTerm(data)
+my_annotation= lapply(allGO,function(x) x[x %in% all_selectedGenes] )
+sig_tab <- allRes
+sig_tab$genes <- apply(allRes,1,function(x) paste(unique(unlist(pc[pc[,"Closest Gene Gencode"] %in% my_annotation[[x[1]]], "Close GeneSym"])), collapse=", "))
+write.table(sig_tab, "report/data/GO/GOEnrichment_pcWithHiCLoop.txt", quote=F, sep="\t")
+```
+
+```{r GO-table2, results="asis", fig.cap="Most enriched GO terms in protein coding genes associated with pcRNAs whose promoter does not overlap a loop. (BG all genes with mouse orthologue)"}
+kable(allRes, format = "markdown")
+```
+
+```{r GO-plot-terms2, fig.width=14, fig.cap="Most enriched GO terms in protein coding genes associated with pcRNAs whose promoter does not overlap a loop. BG all genes with mouse orthologue. p-values were corrected for multiple hypothesis testing using the Benjamini-Hochberg method. Terms with p-value >0.1 are omitted from this plot."}
+ggplot(allRes[allRes$Fisherdef<0.1,], aes(y=Significant/Annotated,x=Term,colour=Fisherdef, size=Significant)) + geom_point(aes(order=desc(Fisherdef))) + scale_colour_gradient(name="p-value", low="red",high="yellow")   + coord_flip() + scale_size(range = c(3, 10))
+```
+
+```{r}
+# BACKGROUND PC ONLY
+bgGenes <- unique(pc$"Closest Gene Gencode")
+
+# Get the list of genes
+selectedGenes <- codingOfPcWithLoops
+
+# Make a copy of all genes that we will use as a background for doing enrichment on the single categories
+all_selectedGenes <- selectedGenes
+
+# Make the geneList for topGO
+geneList <- factor(as.integer( bgGenes %in% selectedGenes))
+names(geneList) <- bgGenes
+
+# Create topGO object
+data <- new("topGOdata", ontology = "BP", allGenes = geneList, annot = annFUN.org, ID = "ensembl", mapping="org.Hs.eg.db", nodeSize = 10)
+
+# Run test and correct p-vals
+resultFis.def <- runTest(data, statistic = "fisher")
+
+#score(resultFis.def) <- p.adjust(score(resultFis.def), method="BH")
+
+
+allRes <- GenTable(data, Fisherdef = resultFis.def,  orderBy="Fisherdef", topNodes=20)
+allRes$Fisherdef <- as.numeric(allRes$Fisherdef)
+allRes$Term <- paste(allRes$Term,allRes$GO.ID)
+allRes$Term <- factor(allRes$Term, levels=allRes$Term[order(allRes$Significant/allRes$Annotated,decreasing=F)])
+
+allGO = genesInTerm(data)
+my_annotation= lapply(allGO,function(x) x[x %in% all_selectedGenes] )
+sig_tab <- allRes
+sig_tab$genes <- apply(allRes,1,function(x) paste(unique(unlist(pc[pc[,"Closest Gene Gencode"] %in% my_annotation[[x[1]]], "Close GeneSym"])), collapse=", "))
+write.table(sig_tab, "report/data/GO/GOEnrichment_pcWithHiCLoop.txt", quote=F, sep="\t")
+```
+
+```{r GO-table3, results="asis", fig.cap="Most enriched GO terms in protein coding genes associated with pcRNAs whose promoter overlaps a loop. (BG all genes with mouse orthologue)"}
+kable(allRes, format = "markdown")
+```
+
+```{r GO-plot-terms3, fig.width=14, fig.cap="Most enriched GO terms in protein coding genes associated with pcRNAs whose promoter overlaps a loop. BG all genes with mouse orthologue. p-values NOT corrected for multiple hypothesis testing using the Benjamini-Hochberg method. Terms with p-value >0.1 are omitted from this plot."}
+ggplot(allRes[allRes$Fisherdef<0.1,], aes(y=Significant/Annotated,x=Term,colour=Fisherdef, size=Significant)) + geom_point(aes(order=desc(Fisherdef))) + scale_colour_gradient(name="p-value", low="red",high="yellow")   + coord_flip() + scale_size(range = c(3, 10))
+```

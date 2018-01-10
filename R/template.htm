@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html>
+  <head> 
+  <title>$if(title-prefix)$$title-prefix$ - $endif$$pagetitle$</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  $for(author-meta)$
+    <meta name="author" content="$author-meta$">
+  $endfor$
+  $if(date-meta)$
+    <meta name="dcterms.date" content="$date-meta$">
+  $endif$
+  
+  <!-- Bootstrap CSS -->
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.2.0/css/bootstrap.min.css">
+
+  <!-- Optional theme -->
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.2.0/css/bootstrap-theme.min.css">
+
+  <script src="//code.jquery.com/jquery.js"></script>
+  
+  <!-- Bootstrap JS -->
+  <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.2.0/js/bootstrap.min.js"></script>
+  <link href='http://fonts.googleapis.com/css?family=Inconsolata:400,700' rel='stylesheet' type='text/css'>
+
+  <!-- Make the affix sidebar responsive -->
+  <style>
+    @media (max-width: 767px) {
+      .affix {
+        position: static;
+        width: auto;
+        top: 0;
+      }
+    }
+    #nav{
+     max-height: 100%;
+     overflow-y: auto;
+    }
+  </style>
+
+  </head>
+
+  <body>
+
+    <div class="container-fluid">
+
+      <div class="masthead">
+        <h3 class="muted">$if(title-prefix)$$title-prefix$ - $endif$$pagetitle$ <small> $author-meta$</small></h3>
+        <hr>
+      </div>
+
+      <div class="row">
+	      <div class="col-md-4">
+		      <div id="nav" data-spy="affix"> 
+		<h4><a href="#">Contents</a></h4>
+          	<ul class="list-unstyled" id="toc"></ul>
+		$toc$
+          	<hr>
+	</div>
+        </div>
+	
+        <div id="content" class="col-sm-6 col-md-6">
+        $body$
+	</div>
+      </div>
+
+      <div class="footer">
+        <hr>
+        <p>&copy; tleonardi@gmail.com</p>
+      </div>
+
+    </div> <!-- /container -->
+
+  </body>
+
+  <script>
+  jQuery("img").addClass("img-responsive");
+  jQuery("table").addClass("table");
+  jQuery("figcaption").css({
+    "font-style": "italic",
+    "margin-bottom": "3em"
+    });
+  jQuery('#nav').affix({
+        offset: {
+                top: 0,
+                bottom: function () {
+                        return (this.bottom = jQuery('.footer').outerHeight(true))
+                }
+        }
+  });
+ jQuery('#nav').on('affixed.bs.affix', function(){
+	this.removeAttr('style');
+  });
+  </script>
+</html>
