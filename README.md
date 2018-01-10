@@ -1,7 +1,14 @@
 # Pipeline for the identification of pcRNAs and tapRNAs
 
 ## Abstract
-The mammalian genome is transcribed into large numbers of long noncoding RNAs (lncRNAs), but the definition of functional lncRNA groups has proven difficult, partly due to their low sequence conservation and lack of identified shared properties. Here we consider positional conservation across mammalian genomes as an indicator of functional commonality. We identify 665 conserved lncRNA promoters in mouse and human genomes that are preserved in genomic position relative to orthologous coding genes. The identified positionally conserved lncRNA genes are primarily associated with developmental transcription factor loci with which they are co-expressed in a tissue-specific manner. Strikingly, over half of all positionally conserved RNAs in this set are linked to distinct chromatin organization structures, overlapping the binding sites for the CTCF chromatin organizer and located at chromatin loop anchor points and borders of topologically associating domains (TADs). These topological anchor point (tap)RNAs possess conserved sequence domains that are enriched in potential recognition motifs for Zinc Finger proteins. Characterization of these non-coding RNAs and their associated coding genes shows that they are functionally connected: they regulate each other ′s expression and influence the metastatic phenotype of cancer cells in vitro in a similar fashion. Thus, interrogation of positionally conserved lncRNAs identifies a new subset of tapRNAs with shared functional properties. These results provide a large dataset of lncRNAs that conform to the ″extended gene″ model, in which conserved developmental genes are genomically and functionally linked to regulatory lncRNA loci across mammalian evolution.
+### Background
+The mammalian genome is transcribed into large numbers of long noncoding RNAs (lncRNAs), but the definition of functional lncRNA groups has proven difficult, partly due to their low sequence conservation and lack of identified shared properties. Here we consider promoter conservation and positional conservation as indicators of functional commonality.
+
+### Results
+We identify 665 conserved lncRNA promoters in mouse and human that are preserved in genomic position relative to orthologous coding genes. These positionally conserved lncRNA genes are primarily associated with developmental transcription factor loci with which they are coexpressed in a tissue-specific manner. Over half of positionally conserved RNAs in this set are linked to chromatin organization structures, overlapping binding sites for the CTCF chromatin organizer and located at chromatin loop anchor points and borders of topologically associating domains (TADs). We define these RNAs as topological anchor point RNAs (tapRNAs). Characterization of these noncoding RNAs and their associated coding genes shows that they are functionally connected: they regulate each other’s expression and influence the metastatic phenotype of cancer cells in vitro in a similar fashion. Furthermore, we find that tapRNAs contain conserved sequence domains that are enriched in motifs for zinc finger domain-containing RNA-binding proteins and transcription factors, whose binding sites are found mutated in cancers.
+
+### Conclusions
+This work leverages positional conservation to identify lncRNAs with potential importance in genome organization, development and disease. The evidence that many developmental transcription factors are physically and functionally connected to lncRNAs represents an exciting stepping-stone to further our understanding of genome regulation.
 
 ## Disclaimer
 This Github repository contains the code of the bioinformatics analysis for our [paper on tapRNAs](https://www.biorxiv.org/content/early/2016/05/04/051052).
@@ -18,11 +25,13 @@ Although the majority of the scripts should run without modifications on any GNU
 * [Samtools](samtools.sourceforge.net/)
 * [UCSC utilities](http://hgdownload.soe.ucsc.edu/downloads.html#utilities_downloads)
 * [NCBI BLAST](https://blast.ncbi.nlm.nih.gov/Blast.cgi?PAGE_TYPE=BlastDocs&DOC_TYPE=Download)
-* [Pfam Scan](ftp://ftp.ebi.ac.uk/pub/databases/Pfam/Tools/)
+* [Pfam Scan](http://ftp.ebi.ac.uk/pub/databases/Pfam/Tools/)
 * [EMBOSS suite](http://emboss.sourceforge.net/index.html)
 
 ## Citation
 _Genomic positional conservation identifies topological anchor point (tap)RNAs linked to developmental loci_
-*Paulo P Amaral, Tommaso Leonardi, Namshik Han, Emmanuelle Vire, Dennis K Gascoigne, Raul Arias-Carrasco, Magdalena Buscher, Anda Zhang, Stefano Pluchino, Vinicius Maracaja-Coutinho, Helder I Nakaya, Martin Hemberg, Ramin Shiekhattar, Anton J Enright, Tony Kouzarides*
+
+**Paulo P Amaral, Tommaso Leonardi, Namshik Han, Emmanuelle Vire, Dennis K Gascoigne, Raul Arias-Carrasco, Magdalena Buscher, Anda Zhang, Stefano Pluchino, Vinicius Maracaja-Coutinho, Helder I Nakaya, Martin Hemberg, Ramin Shiekhattar, Anton J Enright, Tony Kouzarides**
+
 bioRxiv 051052; doi: https://doi.org/10.1101/051052
 
