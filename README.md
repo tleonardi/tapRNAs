@@ -1,4 +1,5 @@
 # Pipeline for the identification of pcRNAs and tapRNAs
+_Paulo P Amaral*, Tommaso Leonardi*, Namshik Han*, Emmanuelle Vire, Dennis K Gascoigne, Raul Arias-Carrasco, Magdalena Buscher, Anda Zhang, Stefano Pluchino, Vinicius Maracaja-Coutinho, Helder I Nakaya, Martin Hemberg, Ramin Shiekhattar, Anton J Enright, Tony Kouzarides_
 
 ## Abstract
 ### Background
@@ -29,9 +30,9 @@ Although the majority of the scripts should run without modifications on any GNU
 * [EMBOSS suite](http://emboss.sourceforge.net/index.html)
 
 ## Citation
-_Genomic positional conservation identifies topological anchor point (tap)RNAs linked to developmental loci_
+**Genomic positional conservation identifies topological anchor point (tap)RNAs linked to developmental loci**
 
-**Paulo P Amaral, Tommaso Leonardi, Namshik Han, Emmanuelle Vire, Dennis K Gascoigne, Raul Arias-Carrasco, Magdalena Buscher, Anda Zhang, Stefano Pluchino, Vinicius Maracaja-Coutinho, Helder I Nakaya, Martin Hemberg, Ramin Shiekhattar, Anton J Enright, Tony Kouzarides**
+_Paulo P Amaral*, Tommaso Leonardi*, Namshik Han*, Emmanuelle Vire, Dennis K Gascoigne, Raul Arias-Carrasco, Magdalena Buscher, Anda Zhang, Stefano Pluchino, Vinicius Maracaja-Coutinho, Helder I Nakaya, Martin Hemberg, Ramin Shiekhattar, Anton J Enright, Tony Kouzarides_
 
 bioRxiv 051052; doi: https://doi.org/10.1101/051052
 
