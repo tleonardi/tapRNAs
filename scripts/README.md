@@ -1,49 +1,43 @@
-# Main pcRNA identification workflow
+# Main pipeline for pcRNAs identification
 
-# download.sh download_fastq.sh
-Download annotations and RNA-Seq fastw files
+### download.sh download_fastq.sh
+Download annotations and RNA-Seq fastq files
 
-# map.sh
-Map the RNA-Seq data to there reference genomes
+### map.sh
+Map the RNA-Seq data to the reference genomes
 
-# coverage.sh
+### coverage.sh
 Produce bigWig coverage files for each RNA-Seq dataset
 
-# assemble.sh
+### assemble.sh
 Run cufflinks to assemble each RNA-Seq dataset
 
-# merge.sh
+### merge.sh
 Run cuffmerge to produce reference transcriptomes for mouse and human
 
-# quant.sh
+### quant.sh
 Run cuffquant to quantitate each RNA-Seq dataset againts the assembled transcriptome
 
-# cuffnorm.sh
-Generate expression matrices for human and mouse
+### cuffnorm.sh
+Generate expression matrixes for human and mouse
 
-# prepare.sh
+### prepare.sh
 Prepare all annotations for the identification of pcRNAs (make references for coding and non-coding, filter, calculate coding potential, etc...)
 
-# identify_blast.sh
+### identify_blast.sh
 Blast human promoters to mouse to identify candidate pcRNAs
 
-# identify_find.sh
-Find pcRNAs
+### identify_find.sh
+Identify pcRNAs
 
-# annotate.sh
+### annotate.sh
 Produce a detailed annotation of pcRNAs
 
-# save_results.sh
+### save_results.sh
 Save useful files in the 'results' folder
 
-# compare_zebrafish.sh
-Identify pcRNAs conserved in zebrafish
-
-# flowchart/..
-Calculate number of transcripts at different stages of the pipeline
-
-# make_hub.sh
+### make_hub.sh
 Make files for the genome browser hub
 
-# other_analysis
-Other analysis
+### other_analysis
+Downstream analysis
