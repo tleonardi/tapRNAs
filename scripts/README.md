@@ -36,8 +36,5 @@ Produce a detailed annotation of pcRNAs
 ### save_results.sh
 Save useful files in the 'results' folder
 
-### make_hub.sh
-Make files for the genome browser hub
-
 ### other_analysis
 Downstream analysis

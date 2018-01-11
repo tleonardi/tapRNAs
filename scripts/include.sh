@@ -60,8 +60,10 @@ export CONVERT2BLASTMASK=/path/to/convert2blastmask
 
 # PFAM SCAN
 export pfam_scan=/path/to/pfam_scan.pl
+export hmmpress=/path/to/HMMER
+export transeq=/path/to/EMBOSS
 
 # WATER AND NEEDLE
-export NEEDLE=/homes/tl344/tom/bin/EMBOSS-6.5.7/emboss/needle
-export WATER=/homes/tl344/tom/bin/EMBOSS-6.5.7/emboss/water
+export NEEDLE=/path/to/EMBOSS
+export WATER=/path/to/EMBOSS
 

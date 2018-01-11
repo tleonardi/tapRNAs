@@ -30,6 +30,31 @@ Although the majority of the scripts should run without modifications on any GNU
 * [NCBI BLAST](https://blast.ncbi.nlm.nih.gov/Blast.cgi?PAGE_TYPE=BlastDocs&DOC_TYPE=Download)
 * [Pfam Scan](http://ftp.ebi.ac.uk/pub/databases/Pfam/Tools/)
 * [EMBOSS suite](http://emboss.sourceforge.net/index.html)
+* [deepTools](https://github.com/deeptools/deepTools)
+* [ImageMagick](http://www.imagemagick.org)
+* [HMMER](http://hmmer.org/)
+
+R packages:
+
+* boot
+* data.table
+* dplyr
+* gdata
+* ggbiplot
+* ggplot2
+* gplots
+* gridExtra
+* MatchIt
+* org.Hs.eg.db
+* plyr
+* RColorBrewer
+* reshape
+* reshape2
+* scales
+* sfsmisc
+* topGO
+* VennDiagram
+
 
 ## Citation
 **Genomic positional conservation identifies topological anchor point (tap)RNAs linked to developmental loci**
