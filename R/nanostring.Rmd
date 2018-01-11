@@ -1,7 +1,7 @@
 ```{r set-options, echo=FALSE, cache=FALSE}
         options(replace.assign=TRUE,width=70)
         opts_chunk$set(dev=c("png","pdf"), dpi=300, fig.cap="", fig.path='nanostring-fig/', cache.path='cache/nanostring-', par=TRUE, echo=FALSE, warning=F, message=F, cache=FALSE, results='hide', error=F)
-	```
+```
 
 ```{r load-libs, cache=F}
 library(gdata)
