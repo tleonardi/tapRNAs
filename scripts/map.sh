@@ -51,7 +51,7 @@ STRANDED_MOUSE="SRR496249$|SRR496250$|SRR496221$|SRR496222$|SRR530639$|SRR530640
 STRANDED_HUMAN="SRR307919$|SRR317040$|SRR307925$|SRR317039$|SRR307911$|SRR307912$|SRR307923$|SRR307924$"
 STRANDED=$(echo "$STRANDED_MOUSE|$STRANDED_HUMAN")
 DRY=""
-ECHO=""
+DEBUG=""
 # Run tophat for mouse and human single end data
 for i in $SEQDATA/single/hsa/*fastq.gz; do
 	SAMP_NAME=$(basename $i .fastq.gz)
@@ -69,7 +69,7 @@ for i in $SEQDATA/single/hsa/*fastq.gz; do
 		NOTMP=""
 	fi
 	if [[ ! -d $BASEDIR/transcriptomes/tophat/hsa/$SAMP_NAME ]]; then
-		$ECHO bsub -q research-rh6 -J $SAMP_NAME -oo $BASEDIR/transcriptomes/tophat/logs/$SAMP_NAME.log -M 50000 -n $P -R 'rusage[mem=50000]' $BIN/lsfTophat.sh $DRY $NOTMP -t $TOPHAT -p "--library-type $LIBTYPE -p $P --transcriptome-index $BASEDIR/transcriptome_index/GencodeV21/GencodeV21 --b2-sensitive --zpacker pigz" -o $BASEDIR/transcriptomes/tophat/hsa/$SAMP_NAME -i "$BASEDIR/data/bowtie_indexes/hg38" -f "$SEQDATA/single/hsa/$SAMP_NAME.fastq.gz"
+		$DEBUG bsub -q research-rh6 -J $SAMP_NAME -oo $BASEDIR/transcriptomes/tophat/logs/$SAMP_NAME.log -M 50000 -n $P -R 'rusage[mem=50000]' $BIN/lsfTophat.sh $DRY $NOTMP -t $TOPHAT -p "--library-type $LIBTYPE -p $P --transcriptome-index $BASEDIR/transcriptome_index/GencodeV21/GencodeV21 --b2-sensitive --zpacker pigz" -o $BASEDIR/transcriptomes/tophat/hsa/$SAMP_NAME -i "$BASEDIR/data/bowtie_indexes/hg38" -f "$SEQDATA/single/hsa/$SAMP_NAME.fastq.gz"
 	fi
 done;
 
@@ -100,7 +100,7 @@ for i in $SEQDATA/single/mmu/*fastq.gz; do
 	fi
 
 	if [[ ! -d $BASEDIR/transcriptomes/tophat/mmu/$SAMP_NAME ]]; then
-		$ECHO bsub -q research-rh6 -J $SAMP_NAME -oo $BASEDIR/transcriptomes/tophat/logs/$SAMP_NAME.log -M 50000 -n $P -R 'rusage[mem=50000]' $BIN/lsfTophat.sh $DRY $NOTMP -t $TOPHAT -p "--library-type $LIBTYPE -p $P $NOCOVSEARCH --transcriptome-index $BASEDIR/transcriptome_index/GencodeM4/GencodeM4 --b2-sensitive --zpacker pigz" -o $BASEDIR/transcriptomes/tophat/mmu/$SAMP_NAME -i "$BASEDIR/data/bowtie_indexes/mm10" -f "$SEQDATA/single/mmu/$SAMP_NAME.fastq.gz"
+		$DEBUG bsub -q research-rh6 -J $SAMP_NAME -oo $BASEDIR/transcriptomes/tophat/logs/$SAMP_NAME.log -M 50000 -n $P -R 'rusage[mem=50000]' $BIN/lsfTophat.sh $DRY $NOTMP -t $TOPHAT -p "--library-type $LIBTYPE -p $P $NOCOVSEARCH --transcriptome-index $BASEDIR/transcriptome_index/GencodeM4/GencodeM4 --b2-sensitive --zpacker pigz" -o $BASEDIR/transcriptomes/tophat/mmu/$SAMP_NAME -i "$BASEDIR/data/bowtie_indexes/mm10" -f "$SEQDATA/single/mmu/$SAMP_NAME.fastq.gz"
 	fi
 done;
 
@@ -124,7 +124,7 @@ for i in $SEQDATA/paired/hsa/*_1.fastq.gz; do
 		NOTMP=""
 	fi
 	if [[ ! -d $BASEDIR/transcriptomes/tophat/hsa/$SAMP_NAME ]]; then
-		$ECHO bsub -q research-rh6 -J $SAMP_NAME -oo $BASEDIR/transcriptomes/tophat/logs/$SAMP_NAME.log -M 50000 -n $P -R 'rusage[mem=50000, tmp=50000]' $BIN/lsfTophat.sh $DRY $NOTMP -t $TOPHAT -p "--library-type $LIBTYPE -p $P --transcriptome-index $BASEDIR/transcriptome_index/GencodeV21/GencodeV21 --b2-sensitive --zpacker pigz" -o $BASEDIR/transcriptomes/tophat/hsa/$SAMP_NAME -i "$BASEDIR/data/bowtie_indexes/hg38" -f "$SEQDATA/paired/hsa/${SAMP_NAME}_1.fastq.gz $SEQDATA/paired/hsa/${SAMP_NAME}_2.fastq.gz"
+		$DEBUG bsub -q research-rh6 -J $SAMP_NAME -oo $BASEDIR/transcriptomes/tophat/logs/$SAMP_NAME.log -M 50000 -n $P -R 'rusage[mem=50000, tmp=50000]' $BIN/lsfTophat.sh $DRY $NOTMP -t $TOPHAT -p "--library-type $LIBTYPE -p $P --transcriptome-index $BASEDIR/transcriptome_index/GencodeV21/GencodeV21 --b2-sensitive --zpacker pigz" -o $BASEDIR/transcriptomes/tophat/hsa/$SAMP_NAME -i "$BASEDIR/data/bowtie_indexes/hg38" -f "$SEQDATA/paired/hsa/${SAMP_NAME}_1.fastq.gz $SEQDATA/paired/hsa/${SAMP_NAME}_2.fastq.gz"
 	fi
 done;
 
@@ -145,10 +145,10 @@ for i in $SEQDATA/paired/mmu/*_1.fastq.gz; do
 	fi
 
 	if [[ ! -d $BASEDIR/transcriptomes/tophat/mmu/$SAMP_NAME ]]; then
-		$ECHO bsub -q research-rh6 -J $SAMP_NAME -oo $BASEDIR/transcriptomes/tophat/logs/$SAMP_NAME.log -M 50000 -n $P -R 'rusage[mem=50000, tmp=50000]' $BIN/lsfTophat.sh $DRY $NOTMP -t $TOPHAT -p "--library-type $LIBTYPE -p $P --transcriptome-index $BASEDIR/transcriptome_index/GencodeM4/GencodeM4 --b2-sensitive --zpacker pigz" -o $BASEDIR/transcriptomes/tophat/mmu/$SAMP_NAME -i "$BASEDIR/data/bowtie_indexes/mm10" -f "$SEQDATA/paired/mmu/${SAMP_NAME}_1.fastq.gz $SEQDATA/paired/mmu/${SAMP_NAME}_2.fastq.gz"
+		$DEBUG bsub -q research-rh6 -J $SAMP_NAME -oo $BASEDIR/transcriptomes/tophat/logs/$SAMP_NAME.log -M 50000 -n $P -R 'rusage[mem=50000, tmp=50000]' $BIN/lsfTophat.sh $DRY $NOTMP -t $TOPHAT -p "--library-type $LIBTYPE -p $P --transcriptome-index $BASEDIR/transcriptome_index/GencodeM4/GencodeM4 --b2-sensitive --zpacker pigz" -o $BASEDIR/transcriptomes/tophat/mmu/$SAMP_NAME -i "$BASEDIR/data/bowtie_indexes/mm10" -f "$SEQDATA/paired/mmu/${SAMP_NAME}_1.fastq.gz $SEQDATA/paired/mmu/${SAMP_NAME}_2.fastq.gz"
 	fi
 done;
 
-if [[ -z $ECHO ]]; then
+if [[ -z $DEBUG ]]; then
 	touch $BASEDIR/.map
 fi
