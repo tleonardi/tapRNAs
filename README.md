@@ -35,26 +35,7 @@ Although the majority of the scripts should run without modifications on any GNU
 * [HMMER](http://hmmer.org/)
 
 R packages:
-
-* boot
-* data.table
-* dplyr
-* gdata
-* ggbiplot
-* ggplot2
-* gplots
-* gridExtra
-* MatchIt
-* org.Hs.eg.db
-* plyr
-* RColorBrewer
-* reshape
-* reshape2
-* scales
-* sfsmisc
-* topGO
-* VennDiagram
-
+boot, data.table, dplyr, gdata, ggbiplot, ggplot2, gplots, gridExtra, MatchIt, org.Hs.eg.db, plyr, RColorBrewer, reshape, reshape2, scales, sfsmisc, topGO, VennDiagram 
 
 ## Citation
 **Genomic positional conservation identifies topological anchor point (tap)RNAs linked to developmental loci**
