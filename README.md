@@ -1,3 +1,5 @@
+[![DOI](https://zenodo.org/badge/116976101.svg)](https://zenodo.org/badge/latestdoi/116976101)
+
 # Pipeline for the identification of pcRNAs and tapRNAs
 _Paulo P. Amaral*, Tommaso Leonardi*, Namshik Han*, Emmanuelle Viré, Dennis K. Gascoigne, Raúl Arias-Carrasco, Magdalena Büscher, Luca Pandolfini, Anda Zhang, Stefano Pluchino, Vinicius Maracaja-Coutinho, Helder I. Nakaya, Martin Hemberg, Ramin Shiekhattar, Anton J. Enright, Tony Kouzarides_
 
