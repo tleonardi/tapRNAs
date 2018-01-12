@@ -55,6 +55,7 @@ export OVERLAPSELECT=/path/to/overlapSelect
 export gtfToGenePred=/path/to/gtfToGenePred
 export genePredToBed=/path/to/genePredToBed
 export twoBitToFa=/path/to/twoBitToFa
+export fetchChromSizes=/path/to/fetchChromSizes
 
 # NCBI BLAST
 export BLASTN=/path/to/blastn
