@@ -33,11 +33,11 @@ join -1 1 -2 2 -t $'\t' <(cut -f2 $PC | sort -k1,1 | uniq) <(cut -f1,2 GencodeV2
 
 # Extract Fasta for human coding
 cut -f2 $DIR/human2mouseCoding.txt | sort -u | $PSTR join --idCol 1 --columns 1 -x stdin $BASEDIR/data/GencodeV21.bed | cut -f1-12 > $DIR/humanCoding.bed
-bedtools getfasta -split -name -s -fi $BASEDIR/data/hg38.fa -bed $DIR/humanCoding.bed -fo $DIR/humanCoding.fasta
+$GETFASTA -split -name -s -fi $BASEDIR/data/hg38.fa -bed $DIR/humanCoding.bed -fo $DIR/humanCoding.fasta
 
 # Extract Fasta for mouse coding
 cut -f4 $DIR/human2mouseCoding.txt | sort -u | $PSTR join --idCol 1 --columns 1 -x stdin $BASEDIR/data/GencodeM4.bed | cut -f1-12 > $DIR/mouseCoding.bed
-bedtools getfasta -split -name -s -fi $BASEDIR/data/mm10.fa -bed $DIR/mouseCoding.bed -fo $DIR/mouseCoding.fasta
+$GETFASTA -split -name -s -fi $BASEDIR/data/mm10.fa -bed $DIR/mouseCoding.bed -fo $DIR/mouseCoding.fasta
 
 
 n=0

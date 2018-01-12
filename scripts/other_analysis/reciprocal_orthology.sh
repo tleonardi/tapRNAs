@@ -4,6 +4,7 @@ export LC_ALL=C
 
 source $( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )/include.sh
 
+# Number of CPUs
 P=16
 
 TMP=/tmp/$LSB_JOBID

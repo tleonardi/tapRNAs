@@ -4,7 +4,6 @@ export LC_ALL=C
 
 source $( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )/include.sh
 
-P=16
 
 mkdir -p $BASEDIR/data
 

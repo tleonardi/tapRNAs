@@ -21,6 +21,7 @@ Although the majority of the scripts should run without modifications on any GNU
 ## Depedencies
 
 * [BEDTools](https://github.com/arq5x/bedtools2)
+* [CPAT](http://rna-cpat.sourceforge.net)
 * [Pinstripe](http://pinstripe.matticklab.com/)
 * [TopHat](https://ccb.jhu.edu/software/tophat/index.shtml)
 * [Bowtie](bowtie-bio.sourceforge.net)
@@ -34,8 +35,7 @@ Although the majority of the scripts should run without modifications on any GNU
 * [ImageMagick](http://www.imagemagick.org)
 * [HMMER](http://hmmer.org/)
 
-R packages:
-boot, data.table, dplyr, gdata, ggbiplot, ggplot2, gplots, gridExtra, MatchIt, org.Hs.eg.db, plyr, RColorBrewer, reshape, reshape2, scales, sfsmisc, topGO, VennDiagram 
+* R packages: boot, data.table, dplyr, gdata, ggbiplot, ggplot2, gplots, gridExtra, MatchIt, org.Hs.eg.db, plyr, RColorBrewer, reshape, reshape2, scales, sfsmisc, topGO, VennDiagram 
 
 ## Citation
 **Genomic positional conservation identifies topological anchor point (tap)RNAs linked to developmental loci**

@@ -1,5 +1,6 @@
 #!/bin/bash
 set -xe -o pipefail
+source $( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )/../include.sh
 
 RESULTS=$BASEDIR/../results
 

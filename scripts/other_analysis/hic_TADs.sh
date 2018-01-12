@@ -10,7 +10,6 @@ source $( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )/include.sh
 
 PC=$BASEDIR/nc/posConNCwithCodingPartner.bedx
 HIC=$BASEDIR/downstream/hic
-P=8
 DIR=$BASEDIR/downstream/hic-tads
 mkdir -p $DIR/data
 
@@ -67,6 +66,7 @@ done)>$DIR/TADOverlapAllLinesPromoter/TADs_contact_summary_all.txt
 
 
 ### Domain coverage by pcRNAs
+# bamCoverave and computeMatrix are part of deepTools
 # Convert the pcRNAs to big wig
 $BEDTOBAM -i  $DIR/data/allLines_TADends.bed -g $BASEDIR/data/hg38.chromSizes >  $DIR/data/allLines_TADends.bam.unsorted
 $SAMTOOLS sort $DIR/data/allLines_TADends.bam.unsorted $DIR/data/allLines_TADends
@@ -80,4 +80,4 @@ convert -density 300 $DIR/pcCoveragebyTADends/pcCoverageByTADs_profile.pdf -qual
 
 
 
-touch touch $BASEDIR/.tad
+touch $BASEDIR/.tad

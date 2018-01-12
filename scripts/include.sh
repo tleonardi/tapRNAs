@@ -29,6 +29,9 @@ export GETFASTA=/path/to/bedtools/bin/fastaFromBed
 export MAP=/path/to/bedtools/bin/mapBed
 export GENOME_COVERAGE_BED=/path/to/bedtools/bin/genomeCoverageBed
 
+# CPAT
+CPAT=/path/to/cpat.py
+
 # Pinstripe
 export PSTR="mono /path/to/pinstripe.exe"
 

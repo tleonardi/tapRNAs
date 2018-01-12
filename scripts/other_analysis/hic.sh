@@ -7,7 +7,7 @@ source $( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )/include.sh
 
 
 PC=$BASEDIR/nc/posConNCwithCodingPartner.bedx
-P=16
+
 DIR=$BASEDIR/downstream/hic
 mkdir -p $DIR/data
 
@@ -45,11 +45,11 @@ cut -f1-6 $DIR/coding.bed > $DIR/pcCoverageByLoops/annotationByPosition/coding.b
 echo "#pcCoding" >> $DIR/pcCoverageByLoops/annotationByPosition/coding.bed
 
 # Make BED file of randome Gencode lincRNAs for Deeptools
-bedtools sample -n 5000 -seed 383847 -i  $DIR/Gencode.v21.linc.spliced.bed | cut -f1-6 > $DIR/pcCoverageByLoops/annotationByPosition/posConAnnot_OnlyGencodeLinc.bed
+$SAMPLE -n 5000 -seed 383847 -i  $DIR/Gencode.v21.linc.spliced.bed | cut -f1-6 > $DIR/pcCoverageByLoops/annotationByPosition/posConAnnot_OnlyGencodeLinc.bed
 echo "#GencodeLinc" >> $DIR/pcCoverageByLoops/annotationByPosition/posConAnnot_OnlyGencodeLinc.bed
 
 # Make BED file of randome Gencode coding for Deeptools
-bedtools sample -n 5000 -seed 383847 -i $BASEDIR/coding/Gencode-current_hsa_coding.bed  | cut -f1-6 > $DIR/pcCoverageByLoops/annotationByPosition/posConAnnot_OnlyGencodeCoding.bed
+$SAMPLE -n 5000 -seed 383847 -i $BASEDIR/coding/Gencode-current_hsa_coding.bed  | cut -f1-6 > $DIR/pcCoverageByLoops/annotationByPosition/posConAnnot_OnlyGencodeCoding.bed
 echo "#GencodeCoding" >> $DIR/pcCoverageByLoops/annotationByPosition/posConAnnot_OnlyGencodeCoding.bed
 
 
@@ -208,7 +208,7 @@ done
 #################################################################
 #       ALL: Make heatmaps of loop overlap
 #################################################################
-
+# bamCoverage and computeMatrix are part of deepTools
 mkdir -p $DIR/pcCoverageByLoopsAllLines
 
 

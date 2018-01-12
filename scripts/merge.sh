@@ -6,6 +6,7 @@ source $( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )/include.sh
 
 
 CUFF_OUT=$BASEDIR/transcriptomes/cufflinks
+# Number of CPUs for LSF
 P=4
 
 # Create output folders

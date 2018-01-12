@@ -4,6 +4,7 @@ export LC_ALL=C
 
 source $( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )/include.sh
 
+# Number of CPUs for LSF
 P=16
 
 OUT=$BASEDIR/transcriptomes/cuffnorm

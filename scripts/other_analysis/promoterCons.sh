@@ -31,13 +31,13 @@ awk 'BEGIN{OFS="\t"}{if ($6=="+") {print $1,$2+500,$2+1500,$4,$5,$6} else {print
 
 
 # Get FASTA
-bedtools getfasta -name -s -fi $BASEDIR/data/hg38.fa -bed $DIR/posConCodingTranscripts_GeneID_promoters.bed -fo $DIR/posConCodingTranscripts_GeneID_promoters.fa
-bedtools getfasta -name -s -fi $BASEDIR/data/hg38.fa -bed $DIR/posConCodingTranscripts_GeneID_promoters_up.bed -fo $DIR/posConCodingTranscripts_GeneID_promoters_up.fa
-bedtools getfasta -name -s -fi $BASEDIR/data/hg38.fa -bed $DIR/posConCodingTranscripts_GeneID_promoters_down.bed -fo $DIR/posConCodingTranscripts_GeneID_promoters_down.fa
+$GETFASTA -name -s -fi $BASEDIR/data/hg38.fa -bed $DIR/posConCodingTranscripts_GeneID_promoters.bed -fo $DIR/posConCodingTranscripts_GeneID_promoters.fa
+$GETFASTA -name -s -fi $BASEDIR/data/hg38.fa -bed $DIR/posConCodingTranscripts_GeneID_promoters_up.bed -fo $DIR/posConCodingTranscripts_GeneID_promoters_up.fa
+$GETFASTA -name -s -fi $BASEDIR/data/hg38.fa -bed $DIR/posConCodingTranscripts_GeneID_promoters_down.bed -fo $DIR/posConCodingTranscripts_GeneID_promoters_down.fa
 
-bedtools getfasta -name -s -fi $BASEDIR/data/hg38.fa -bed  $DIR/posConNCwithCodingPartner_promoters.bed -fo $DIR/posConNCwithCodingPartner_promoters.fa
-bedtools getfasta -name -s -fi $BASEDIR/data/hg38.fa -bed  $DIR/posConNCwithCodingPartner_promoters_up.bed -fo $DIR/posConNCwithCodingPartner_promoters_up.fa
-bedtools getfasta -name -s -fi $BASEDIR/data/hg38.fa -bed  $DIR/posConNCwithCodingPartner_promoters_down.bed -fo $DIR/posConNCwithCodingPartner_promoters_down.fa
+$GETFASTA -name -s -fi $BASEDIR/data/hg38.fa -bed  $DIR/posConNCwithCodingPartner_promoters.bed -fo $DIR/posConNCwithCodingPartner_promoters.fa
+$GETFASTA -name -s -fi $BASEDIR/data/hg38.fa -bed  $DIR/posConNCwithCodingPartner_promoters_up.bed -fo $DIR/posConNCwithCodingPartner_promoters_up.fa
+$GETFASTA -name -s -fi $BASEDIR/data/hg38.fa -bed  $DIR/posConNCwithCodingPartner_promoters_down.bed -fo $DIR/posConNCwithCodingPartner_promoters_down.fa
 
 
 # For each pair of PC->coding gene

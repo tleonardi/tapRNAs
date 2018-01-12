@@ -5,9 +5,6 @@ export LC_ALL=C
 source $( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )/include.sh
 
 
-P=16
-
-
 #########################################################
 #							#
 #			HUMAN				#
@@ -62,8 +59,8 @@ awk '$10>1 && $1!~/_/ && $1!="chrM"' $BASEDIR/transcriptomes/cuffmerge/hsa/merge
 $PSTR dedup -p $P --exEncomp $BASEDIR/human/transcripts/allNocode.bed > $BASEDIR/human/transcripts/allNocode_nr.bed
 
 # Calculate coding potential with CPAT
-bedtools getfasta -split -name -s -fi $BASEDIR/data/hg38.fa -bed $BASEDIR/human/transcripts/allNocode_nr.bed -fo $BASEDIR/human/transcripts/allNocode_nr.fa
-cpat.py -g $BASEDIR/human/transcripts/allNocode_nr.fa -x $DATA/prebuilt_cpat_models/Human_Hexamer.tab -d $DATA/prebuilt_cpat_models/Human_logitModel.RData -o $BASEDIR/human/transcripts/allNocode_nr.cpat
+$GETFASTA -split -name -s -fi $BASEDIR/data/hg38.fa -bed $BASEDIR/human/transcripts/allNocode_nr.bed -fo $BASEDIR/human/transcripts/allNocode_nr.fa
+$CPAT -g $BASEDIR/human/transcripts/allNocode_nr.fa -x $DATA/prebuilt_cpat_models/Human_Hexamer.tab -d $DATA/prebuilt_cpat_models/Human_logitModel.RData -o $BASEDIR/human/transcripts/allNocode_nr.cpat
 
 # remove header line and sort by id
 tail -n +2 $BASEDIR/human/transcripts/allNocode_nr.cpat | sort -k1,1 > $BASEDIR/human/transcripts/allNocode_nr.cpat.sort
@@ -127,8 +124,8 @@ cat $BASEDIR/data/Gencode-current_mmu.bed $BASEDIR/mouse/transcripts/deNovoSplic
 
 
 # Calculate coding potential with CPAT
-bedtools getfasta -split -name -s -fi $BASEDIR/data/mm10.fa -bed $BASEDIR/mouse/transcripts/allNocode_nr.bed -fo $BASEDIR/mouse/transcripts/allNocode_nr.fa
-cpat.py -g $BASEDIR/mouse/transcripts/allNocode_nr.fa -x $DATA/prebuilt_cpat_models/Mouse_Hexamer.tab -d $DATA/prebuilt_cpat_models/Mouse_logitModel.RData -o $BASEDIR/mouse/transcripts/allNocode_nr.cpat
+$GETFASTA -split -name -s -fi $BASEDIR/data/mm10.fa -bed $BASEDIR/mouse/transcripts/allNocode_nr.bed -fo $BASEDIR/mouse/transcripts/allNocode_nr.fa
+$CPAT -g $BASEDIR/mouse/transcripts/allNocode_nr.fa -x $DATA/prebuilt_cpat_models/Mouse_Hexamer.tab -d $DATA/prebuilt_cpat_models/Mouse_logitModel.RData -o $BASEDIR/mouse/transcripts/allNocode_nr.cpat
 
 # remove header line and sort by id
 tail -n +2 $BASEDIR/mouse/transcripts/allNocode_nr.cpat | sort -k1,1 > $BASEDIR/mouse/transcripts/allNocode_nr.cpat.sort
@@ -162,8 +159,8 @@ fi
 awk '$10>1'  $BASEDIR/data/mm10_allmrna_canonical.bed | sort -k1,1 -k2,2n -k3,3n | $OVERLAPSELECT -strand -overlapBases=20 -nonOverlapping -inFmt=bed $BASEDIR/coding/Gencode_mm10_codingExons.bed stdin stdout > $BASEDIR/nc/mm10_allmrna_spliced_noCodOverlap.bed
 
 # Calculate coding potential with CPAT
-bedtools getfasta -split -name -s -fi $BASEDIR/data/mm10.fa -bed $BASEDIR/nc/mm10_allmrna_spliced_noCodOverlap.bed -fo $BASEDIR/nc/mm10_allmrna_spliced_noCodOverlap.fa
-cpat.py -g $BASEDIR/nc/mm10_allmrna_spliced_noCodOverlap.fa -x $DATA/prebuilt_cpat_models/Mouse_Hexamer.tab -d $DATA/prebuilt_cpat_models/Mouse_logitModel.RData -o $BASEDIR/nc/mm10_allmrna_spliced_noCodOverlap.bed.cpat
+$GETFASTA -split -name -s -fi $BASEDIR/data/mm10.fa -bed $BASEDIR/nc/mm10_allmrna_spliced_noCodOverlap.bed -fo $BASEDIR/nc/mm10_allmrna_spliced_noCodOverlap.fa
+$CPAT -g $BASEDIR/nc/mm10_allmrna_spliced_noCodOverlap.fa -x $DATA/prebuilt_cpat_models/Mouse_Hexamer.tab -d $DATA/prebuilt_cpat_models/Mouse_logitModel.RData -o $BASEDIR/nc/mm10_allmrna_spliced_noCodOverlap.bed.cpat
 
 # Some transcript IDs in mm10_allmrna_spliced_noCodOverlap.bed are duplicate,
 # therefore we can't sort the files and join them based on IDs

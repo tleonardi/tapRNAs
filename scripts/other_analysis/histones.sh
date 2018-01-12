@@ -4,14 +4,13 @@ shopt -s extglob
 source $( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )/include.sh
 export LC_ALL=C
 
-P=4
 TMP=/tmp/$LSB_JOBID
 mkdir -p $TMP
 
 # Download histone mod data
 mkdir -p $BASEDIR/downstream/histones/data/hg19
 CD=$BASEDIR/downstream/histones/
-fetchChromSizes hg38 > $BASEDIR/data/hg38.chromSizes
+$fetchChromSizes hg38 > $BASEDIR/data/hg38.chromSizes
 # Download data
 for i in $(awk '!/#/{print $1}' $DATA/histone_chipseq_data.txt); do
 	NAME=$(basename $i .bw | sed 's/wgEncodeBroadHistone//' | sed -E 's/StdAln.+//')

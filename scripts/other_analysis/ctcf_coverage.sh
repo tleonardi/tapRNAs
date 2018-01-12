@@ -1,6 +1,7 @@
 #!/bin/bash
 set -xe -o pipefail
 shopt -s extglob
+source $( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )/../include.sh
 
 PC=$BASEDIR/nc/posConNCwithCodingPartner.bedx
 HIC=$BASEDIR/downstream/hic
