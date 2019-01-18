@@ -14,7 +14,7 @@ We identify 665 conserved lncRNA promoters in mouse and human that are preserved
 This work leverages positional conservation to identify lncRNAs with potential importance in genome organization, development and disease. The evidence that many developmental transcription factors are physically and functionally connected to lncRNAs represents an exciting stepping-stone to further our understanding of genome regulation.
 
 ## Disclaimer
-This Github repository contains the code of the bioinformatics analysis for our [paper on tapRNAs](https://www.biorxiv.org/content/early/2016/05/04/051052).
+This Github repository contains the code of the bioinformatics analysis for our [paper on tapRNAs](https://doi.org/10.1186/s13059-018-1405-5).
 We published this repository to allow the scientific community to verify and reproduce our results, but the code is not to be intended as a standalone, general purpose tool. 
 Although the majority of the scripts should run without modifications on any GNU/Linux distribution, some of them are tied to the system where they were developed (e.g. make use of IBM LSF queing system).
 
@@ -37,9 +37,13 @@ Although the majority of the scripts should run without modifications on any GNU
 * [R](https://www.r-project.org/) (packages: boot, data.table, dplyr, gdata, ggbiplot, ggplot2, gplots, gridExtra, MatchIt, org.Hs.eg.db, plyr, RColorBrewer, reshape, reshape2, scales, sfsmisc, topGO, VennDiagram)
 
 ## Citation
-**Genomic positional conservation identifies topological anchor point (tap)RNAs linked to developmental loci**
 
-_Paulo P. Amaral*, Tommaso Leonardi*, Namshik Han*, Emmanuelle Viré, Dennis K. Gascoigne, Raúl Arias-Carrasco, Magdalena Büscher, Luca Pandolfini, Anda Zhang, Stefano Pluchino, Vinicius Maracaja-Coutinho, Helder I. Nakaya, Martin Hemberg, Ramin Shiekhattar, Anton J. Enright, Tony Kouzarides_
+**Genomic positional conservation identifies topological anchor point RNAs linked to developmental loci**
 
-bioRxiv 051052; doi: https://doi.org/10.1101/051052
+_Paulo P. Amaral*, Tommaso Leonardi*, Namshik Han*, Emmanuelle Viré, Dennis K. Gascoigne, Raúl Arias-Carrasco, Magdalena Büscher, Luca Pandolfini, Anda Zhang, Stefano Pluchino, Vinicius Maracaja-Coutinho, Helder I. Nakaya, Martin Hemberg, Ramin Shiekhattar, Anton J. Enright and Tony Kouzarides_
+
+Genome Biology 2018
+
+doi: https://doi.org/10.1186/s13059-018-1405-5
+
 
